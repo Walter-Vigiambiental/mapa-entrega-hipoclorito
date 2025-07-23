@@ -11,47 +11,46 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys
 
 def carregar_dados():
     df = pd.read_csv(CSV_URL)
-    df.columns = df.columns.str.lower().str.strip()
+    df.columns = df.columns.str.strip().str.lower()
+    df.rename(columns={
+        'localidade': 'localidade',
+        'latitude': 'latitude',
+        'longitude': 'longitude',
+        'data': 'data',
+        'frascos': 'quantidade',
+        'mês': 'mes',
+        'ano': 'ano'
+    }, inplace=True)
     df['data'] = pd.to_datetime(df['data'], errors='coerce')
-    df['ano'] = df['data'].dt.year
-    df['mês'] = df['data'].dt.month
-    df['quantidade'] = df['frascos']
-    return df.dropna(subset=['latitude', 'longitude'])
+    df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
+    df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
+    df = df.dropna(subset=['localidade', 'latitude', 'longitude', 'quantidade', 'ano', 'mes'])
+    return df
 
 df = carregar_dados()
-if df.empty:
-    st.stop()
 
-localidades = st.sidebar.multiselect("📍 Localidades", sorted(df['localidade'].dropna().unique()))
+st.sidebar.header("Filtros")
+localidades = st.sidebar.multiselect("📍 Localidades", sorted(df['localidade'].unique()))
+anos = st.sidebar.selectbox("📆 Ano", options=["Todos"] + sorted(df['ano'].astype(str).unique().tolist()))
+meses = st.sidebar.selectbox("🗓️ Mês", options=["Todos"] + sorted(df['mes'].astype(str).unique().tolist()))
+
 if localidades:
     df = df[df['localidade'].isin(localidades)]
+if anos != "Todos":
+    df = df[df['ano'].astype(str) == anos]
+if meses != "Todos":
+    df = df[df['mes'].astype(str) == meses]
 
-anos_disponiveis = sorted(df['ano'].dropna().unique())
-meses_disponiveis = sorted(df['mês'].dropna().unique())
-
-col1, col2 = st.columns(2)
-ano_sel = col1.selectbox("📆 Ano", options=["Todos"] + list(anos_disponiveis))
-mes_sel = col2.selectbox("🗓️ Mês", options=["Todos"] + list(meses_disponiveis))
-
-df_filt = df.copy()
-if ano_sel != "Todos":
-    df_filt = df_filt[df_filt['ano'] == ano_sel]
-if mes_sel != "Todos":
-    df_filt = df_filt[df_filt['mês'] == mes_sel]
-
-agrupado = df_filt.groupby(['localidade', 'latitude', 'longitude', 'ano', 'mês'], as_index=False)['quantidade'].sum()
-agrupado['latitude'] = pd.to_numeric(agrupado['latitude'], errors='coerce')
-agrupado['longitude'] = pd.to_numeric(agrupado['longitude'], errors='coerce')
-agrupado = agrupado.dropna(subset=['latitude', 'longitude'])
+df_agrupado = df.groupby(['localidade', 'latitude', 'longitude', 'ano', 'mes'], as_index=False)['quantidade'].sum()
 
 mapa = folium.Map(location=[-7.5, -39.0], zoom_start=7)
 cluster = MarkerCluster().add_to(mapa)
 
-for _, row in agrupado.iterrows():
+for _, row in df_agrupado.iterrows():
     popup = f"""<b>Localidade:</b> {row['localidade']}<br>
-    <b>Ano:</b> {int(row['ano'])}<br>
-    <b>Mês:</b> {int(row['mês'])}<br>
-    <b>Quantidade entregue:</b> {row['quantidade']} frascos"""
+    <b>Ano:</b> {row['ano']}<br>
+    <b>Mês:</b> {row['mes']}<br>
+    <b>Total entregue:</b> {int(row['quantidade'])} frascos"""
     folium.Marker(
         location=[row['latitude'], row['longitude']],
         popup=popup,
