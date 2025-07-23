@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import folium
+import re
 from folium.plugins import MarkerCluster
 from streamlit_folium import folium_static
 
@@ -8,6 +9,15 @@ st.set_page_config(page_title="Mapa de Entregas de Hipoclorito", layout="wide")
 st.title("📍 Mapa Interativo de Entregas de Hipoclorito")
 
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
+
+def limpar_coordenada(valor):
+    if pd.isna(valor):
+        return None
+    valor = re.sub(r"[^0-9.\-]", "", str(valor))
+    try:
+        return float(valor)
+    except:
+        return None
 
 def carregar_dados():
     df = pd.read_csv(CSV_URL)
@@ -22,8 +32,8 @@ def carregar_dados():
         'ano': 'ano'
     }, inplace=True)
     df['data'] = pd.to_datetime(df['data'], errors='coerce')
-    df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
-    df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
+    df['latitude'] = df['latitude'].apply(limpar_coordenada)
+    df['longitude'] = df['longitude'].apply(limpar_coordenada)
     df = df.dropna(subset=['localidade', 'latitude', 'longitude', 'quantidade', 'ano', 'mes'])
     return df
 
@@ -31,8 +41,8 @@ df = carregar_dados()
 
 st.sidebar.header("Filtros")
 localidades = st.sidebar.multiselect("📍 Localidades", sorted(df['localidade'].unique()))
-anos = st.sidebar.selectbox("📆 Ano", options=["Todos"] + sorted(df['ano'].astype(str).unique().tolist()))
-meses = st.sidebar.selectbox("🗓️ Mês", options=["Todos"] + sorted(df['mes'].astype(str).unique().tolist()))
+anos = st.sidebar.selectbox("📆 Ano", options=["Todos"] + sorted(df['ano'].astype(str).unique()))
+meses = st.sidebar.selectbox("🗓️ Mês", options=["Todos"] + sorted(df['mes'].astype(str).unique()))
 
 if localidades:
     df = df[df['localidade'].isin(localidades)]

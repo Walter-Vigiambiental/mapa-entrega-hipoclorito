@@ -1,8 +1,8 @@
 # Mapa de Entrega de Hipoclorito
 
-Para rodar localmente:
+## Como rodar
 
-```
+```bash
 pip install -r requirements.txt
 streamlit run app.py
 ```
