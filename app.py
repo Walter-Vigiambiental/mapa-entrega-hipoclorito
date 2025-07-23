@@ -11,65 +11,68 @@ st.title("📍 Mapa Interativo de Entregas de Hipoclorito")
 # LINK DA PLANILHA (Google Sheets CSV)
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
-# FUNÇÃO PARA CARREGAR OS DADOS (SEM CACHE)
 def carregar_dados():
     df = pd.read_csv(CSV_URL)
-
-    # Trata nomes de colunas esperados
     df.columns = df.columns.str.lower().str.strip()
 
-    # Confere existência das colunas necessárias
-    colunas_necessarias = {'localidade', 'data', 'quantidade', 'latitude', 'longitude'}
-    if not colunas_necessarias.issubset(set(df.columns)):
+    # Ajusta nomes e cria quantidade
+    df.rename(columns={
+        'data': 'data',
+        'caixas': 'caixas',
+        'frascos': 'frascos',
+        'mês': 'mês',
+        'ano': 'ano'
+    }, inplace=True)
+
+    # Usa frascos como quantidade (você pode ajustar aqui)
+    df['quantidade'] = df['frascos']
+
+    df['data'] = pd.to_datetime(df['data'], errors='coerce')
+    df['ano'] = df['data'].dt.year
+    df['mês'] = df['data'].dt.month
+
+    colunas_necessarias = {'localidade', 'latitude', 'longitude', 'quantidade', 'data'}
+    if not colunas_necessarias.issubset(df.columns):
         st.error(f"⚠️ Colunas obrigatórias ausentes: {colunas_necessarias - set(df.columns)}")
         return pd.DataFrame()
-
-    # Converte data
-    df['data'] = pd.to_datetime(df['data'], errors='coerce')
-    df['Ano'] = df['data'].dt.year
-    df['Mês'] = df['data'].dt.month
     return df.dropna(subset=['latitude', 'longitude'])
 
-# Carrega os dados
 df = carregar_dados()
 if df.empty:
     st.stop()
 
-# === FILTRO POR LOCALIDADE ===
+# FILTRO POR LOCALIDADE
 localidades = st.sidebar.multiselect("📍 Localidades", sorted(df['localidade'].dropna().unique()))
 if localidades:
     df = df[df['localidade'].isin(localidades)]
 
-# === FILTROS DE TEMPO ===
-anos_disponiveis = sorted(df['Ano'].dropna().unique())
-meses_disponiveis = sorted(df['Mês'].dropna().unique())
+# FILTROS DE ANO E MÊS
+anos_disponiveis = sorted(df['ano'].dropna().unique())
+meses_disponiveis = sorted(df['mês'].dropna().unique())
 
 col1, col2 = st.columns(2)
 ano_sel = col1.selectbox("📆 Ano", options=["Todos"] + list(anos_disponiveis))
 mes_sel = col2.selectbox("🗓️ Mês", options=["Todos"] + list(meses_disponiveis))
 
-# Aplica filtros
 df_filt = df.copy()
 if ano_sel != "Todos":
-    df_filt = df_filt[df_filt['Ano'] == ano_sel]
+    df_filt = df_filt[df_filt['ano'] == ano_sel]
 if mes_sel != "Todos":
-    df_filt = df_filt[df_filt['Mês'] == mes_sel]
+    df_filt = df_filt[df_filt['mês'] == mes_sel]
 
-# Agrupa entregas por localidade/mês/ano
 agrupado = df_filt.groupby(
-    ['localidade', 'latitude', 'longitude', 'Ano', 'Mês'],
+    ['localidade', 'latitude', 'longitude', 'ano', 'mês'],
     as_index=False
 )['quantidade'].sum()
 
-# === MAPA ===
 mapa = folium.Map(location=[-7.5, -39.0], zoom_start=7)
 cluster = MarkerCluster().add_to(mapa)
 
 for _, row in agrupado.iterrows():
     popup = f"""<b>Localidade:</b> {row['localidade']}<br>
-    <b>Ano:</b> {int(row['Ano'])}<br>
-    <b>Mês:</b> {int(row['Mês'])}<br>
-    <b>Quantidade entregue:</b> {row['quantidade']} L"""
+    <b>Ano:</b> {int(row['ano'])}<br>
+    <b>Mês:</b> {int(row['mês'])}<br>
+    <b>Quantidade entregue:</b> {row['quantidade']} frascos"""
     folium.Marker(
         location=[row['latitude'], row['longitude']],
         popup=popup,
