@@ -92,9 +92,22 @@ if "Todos" not in mes_selecionados:
 if local_selecionado != "Todos":
     df_estoque = df_estoque[df_estoque['LOCAL'] == local_selecionado]
 
-df_estoque['MÊS_ANO'] = df_estoque.apply(
-    lambda row: f"{mes_format.get(row['Mês'], '')} {int(row['Ano'])}", axis=1
-)
+# Verificar última entrega por local
+entregas_recentes = dados_entrega.groupby('LOCAL')['DATA'].max().reset_index().rename(columns={'DATA': 'ULTIMA_ENTREGA'})
+df_estoque = pd.merge(df_estoque, entregas_recentes, on='LOCAL', how='left')
+
+# Mostrar somente estoques registrados após a última entrega (ou sem entrega)
+df_estoque = df_estoque[
+    (df_estoque['DATA'] >= df_estoque['ULTIMA_ENTREGA']) | (df_estoque['ULTIMA_ENTREGA'].isna())
+].copy()
+
+# Gerar campo MÊS_ANO
+if not df_estoque.empty and 'Ano' in df_estoque.columns and 'Mês' in df_estoque.columns:
+    df_estoque['MÊS_ANO'] = df_estoque.apply(
+        lambda row: f"{mes_format.get(row['Mês'], '')} {int(row['Ano'])}", axis=1
+    )
+else:
+    df_estoque['MÊS_ANO'] = ""
 
 st.subheader("🧴 Locais com hipoclorito em estoque declarado")
 if not df_estoque.empty:
@@ -104,7 +117,7 @@ if not df_estoque.empty:
         hide_index=True
     )
 else:
-    st.info("✅ Nenhum estoque declarado para este filtro.")
+    st.info("✅ Nenhum estoque declarado válido para este filtro.")
 
 # Mapa de entregas
 st.subheader("🗺️ Mapa de Entregas por Local")
@@ -135,4 +148,4 @@ if not df_estoque.empty:
             fill_opacity=0.7,
             popup=texto_popup
         ).add_to(mapa_estoque)
-    folium_static(mapa_estoque)
+    folium_static(mapa_esto
