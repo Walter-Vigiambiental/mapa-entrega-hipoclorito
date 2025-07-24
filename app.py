@@ -4,6 +4,7 @@ import folium
 import calendar
 from streamlit_folium import folium_static
 
+# URL pública do CSV
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
 @st.cache_data(ttl=600)
@@ -11,7 +12,7 @@ def load_data():
     df = pd.read_csv(CSV_URL)
     df.columns = df.columns.str.strip()
 
-    # Extrair LATITUDE e LONGITUDE da coluna COORDENADAS
+    # Separar LATITUDE e LONGITUDE a partir da coluna COORDENADAS
     if 'COORDENADAS' in df.columns:
         df[['LATITUDE', 'LONGITUDE']] = df['COORDENADAS'].str.split(',', expand=True)
         df['LATITUDE'] = pd.to_numeric(df['LATITUDE'].str.strip(), errors='coerce')
@@ -24,7 +25,6 @@ def load_data():
     df['Ano'] = df['DATA'].dt.year
     df['Mês'] = df['DATA'].dt.month.astype('Int64')
 
-    # Calcular número de frascos entregues
     df['CAIXAS'] = pd.to_numeric(df['CAIXAS'], errors='coerce')
     df['FRASCOS'] = df['CAIXAS'] * 50  # Assumindo 50 frascos por caixa
 
@@ -34,10 +34,10 @@ def load_data():
 
 df = load_data()
 
-st.title("📍 Mapa de Entregas de Hipoclorito")
+st.title("📦 Entregas de Hipoclorito")
 st.write("Visualize os frascos entregues por mês e ano.")
 
-# Filtros interativos com "Todos"
+# Filtros com opção "Todos"
 anos_disponiveis = sorted(df['Ano'].dropna().unique())
 ano_opcoes = ["Todos"] + [str(a) for a in anos_disponiveis]
 ano_selecionado = st.selectbox("Filtrar por Ano", options=ano_opcoes)
@@ -50,9 +50,19 @@ mes_selecionado = st.selectbox("Filtrar por Mês", options=mes_opcoes, format_fu
 # Aplicar filtros
 dados = df.copy()
 if ano_selecionado != "Todos":
-    dados = dados[dados['Ano'] == int(ano_selecionado)]
+    try:
+        ano_int = int(float(ano_selecionado))
+        dados = dados[dados['Ano'] == ano_int]
+    except:
+        st.error("Erro ao interpretar o ano selecionado.")
+        st.stop()
 if mes_selecionado != "Todos":
-    dados = dados[dados['Mês'] == int(mes_selecionado)]
+    try:
+        mes_int = int(mes_selecionado)
+        dados = dados[dados['Mês'] == mes_int]
+    except:
+        st.error("Erro ao interpretar o mês selecionado.")
+        st.stop()
 
 # Somatório
 total_frascos = dados['FRASCOS'].sum()
@@ -61,7 +71,7 @@ st.subheader("📋 Dados filtrados")
 st.write(f"**Total entregue:** {total_frascos:.0f} frascos")
 st.dataframe(dados[['DATA', 'LOCAL', 'CAIXAS', 'FRASCOS', 'LATITUDE', 'LONGITUDE']])
 
-# Mapa interativo
+# Mapa
 m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
 
 if dados.empty:
@@ -71,8 +81,8 @@ else:
         try:
             lat = float(row['LATITUDE'])
             lon = float(row['LONGITUDE'])
-            texto_popup = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos"
-            folium.Marker(location=[lat, lon], popup=texto_popup).add_to(m)
+            popup_text = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos"
+            folium.Marker(location=[lat, lon], popup=popup_text).add_to(m)
         except Exception:
             continue
 
