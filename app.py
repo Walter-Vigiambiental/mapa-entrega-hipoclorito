@@ -2,15 +2,12 @@ import streamlit as st
 import pandas as pd
 import folium
 import calendar
-import qrcode
-from PIL import Image
-from io import BytesIO
 from streamlit_folium import folium_static
 
 # URL do CSV
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
-# Tradução manual dos meses
+# Tradução dos meses para português
 mes_format = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
     7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
@@ -33,7 +30,7 @@ def load_data():
     df['CAIXAS'] = pd.to_numeric(df['CAIXAS'], errors='coerce')
     df['FRASCOS'] = df['CAIXAS'] * 50
 
-    # Remover registros incompletos
+    # Remover registros incompletos ou sem entregas
     df = df.dropna(subset=['LATITUDE', 'LONGITUDE'])
     df = df[df['CAIXAS'] > 0]
 
@@ -98,7 +95,7 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final)
 
-# Mapa por local com somatório total
+# Mapa com somatório por LOCAL
 st.subheader("🗺️ Mapa por Local")
 m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
 
@@ -109,15 +106,6 @@ else:
     for _, row in agrupados.iterrows():
         lat = float(row['LATITUDE'])
         lon = float(row['LONGITUDE'])
-        texto_popup = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues no total"
-        folium.Marker(location=[lat, lon], popup=texto_popup).add_to(m)
+        popup_text = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues no total"
+        folium.Marker(location=[lat, lon], popup=popup_text).add_to(m)
     folium_static(m)
-
-# QR Code do app
-st.subheader("📱 Acesso rápido via QR Code")
-link_app = "https://mapa-entrega-hipoclorito-fhp5dwviijfw9rwwtka8ky.streamlit.app/"
-qr = qrcode.make(link_app)
-buffer = BytesIO()
-qr.save(buffer, format="PNG")
-buffer.seek(0)
-st.image(Image.open(buffer), caption=link_app)
