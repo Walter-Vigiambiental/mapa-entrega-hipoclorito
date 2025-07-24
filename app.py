@@ -3,7 +3,7 @@ import pandas as pd
 import folium
 from streamlit_folium import folium_static
 
-# Fonte dos dados
+# URL da planilha pública
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
 # Meses em português
@@ -49,11 +49,10 @@ mes_selecionados = st.multiselect(
 local_opcoes = ["Todos"] + sorted(df['LOCAL'].dropna().unique().tolist())
 local_selecionado = st.selectbox("Filtrar por Local", options=local_opcoes)
 
-# Aplicar filtros
 dados = df.copy()
 if ano_selecionado != "Todos":
     try:
-        dados = dados[dados['Ano'] == int(ano_selecionado)]
+        dados = dados[dados['Ano'] == int(float(ano_selecionado))]
     except ValueError:
         st.error("Erro: ano inválido.")
         st.stop()
@@ -86,7 +85,7 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True)
 
-# Estoques declarados dentro do período filtrado sem entrega posterior
+# Estoques declarados no período sem entrega posterior
 if 'REMANESCENTES' in dados.columns:
     dados['REMANESCENTES'] = pd.to_numeric(dados['REMANESCENTES'], errors='coerce').fillna(0)
 
@@ -116,7 +115,7 @@ for _, row in agrupados.iterrows():
     folium.Marker(location=[lat, lon], popup=texto).add_to(m)
 folium_static(m)
 
-# Mapa de estoques remanescentes
+# Mapa de estoques
 if not estoque_validado.empty:
     st.subheader("🗺️ Estoques de hipoclorito (Remanescentes > 0)")
     mapa_remanescentes = folium.Map(location=[-17.89, -43.42], zoom_start=8)
