@@ -4,7 +4,7 @@ import folium
 import calendar
 from streamlit_folium import folium_static
 
-# Link do CSV no Google Sheets
+# URL da planilha CSV publicada
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
 @st.cache_data(ttl=600)
@@ -12,11 +12,16 @@ def load_data():
     df = pd.read_csv(CSV_URL)
     df.columns = df.columns.str.strip()
 
-    # Extrair LATITUDE e LONGITUDE a partir da coluna COORDENADAS
-    df[['LATITUDE', 'LONGITUDE']] = df['COORDENADAS'].str.split(',', expand=True)
-    df['LATITUDE'] = pd.to_numeric(df['LATITUDE'].str.strip(), errors='coerce')
-    df['LONGITUDE'] = pd.to_numeric(df['LONGITUDE'].str.strip(), errors='coerce')
+    # Extrair LATITUDE e LONGITUDE da coluna COORDENADAS
+    if 'COORDENADAS' in df.columns:
+        df[['LATITUDE', 'LONGITUDE']] = df['COORDENADAS'].str.split(',', expand=True)
+        df['LATITUDE'] = pd.to_numeric(df['LATITUDE'].str.strip(), errors='coerce')
+        df['LONGITUDE'] = pd.to_numeric(df['LONGITUDE'].str.strip(), errors='coerce')
+    else:
+        st.error("Coluna 'COORDENADAS' não encontrada.")
+        st.stop()
 
+    # Conversões e cálculos
     df['DATA'] = pd.to_datetime(df['DATA'], format="%d/%m/%Y", errors='coerce')
     df['Ano'] = df['DATA'].dt.year
     df['Mês'] = df['DATA'].dt.month.astype('Int64')
@@ -51,7 +56,6 @@ local_selecionado = st.selectbox("Filtrar por Local", options=local_opcoes)
 
 # Aplicar filtros
 dados = df.copy()
-
 if ano_selecionado != "Todos":
     try:
         ano_int = int(float(ano_selecionado))
@@ -76,7 +80,11 @@ total_frascos = dados['FRASCOS'].sum()
 
 st.subheader("📋 Dados filtrados")
 st.write(f"**Total entregue:** {total_frascos:.0f} frascos")
-st.dataframe(dados[['DATA', 'LOCAL', 'CAIXAS', 'FRASCOS', 'LATITUDE', 'LONGITUDE']])
+
+# Exibir Data como "Janeiro 2024"
+df_exibicao = dados.copy()
+df_exibicao['DATA'] = df_exibicao['DATA'].dt.strftime("%B %Y")
+st.dataframe(df_exibicao[['DATA', 'LOCAL', 'CAIXAS', 'FRASCOS', 'LATITUDE', 'LONGITUDE']])
 
 # Mapa
 m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
