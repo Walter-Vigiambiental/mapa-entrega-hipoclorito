@@ -4,7 +4,7 @@ import folium
 import calendar
 from streamlit_folium import folium_static
 
-# URL do CSV
+# URL da planilha pública
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
 # Tradução dos meses para português
@@ -93,7 +93,7 @@ linha_total = pd.DataFrame([{
     'LONGITUDE': ''
 }])
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
-st.dataframe(tabela_final)
+st.dataframe(tabela_final, use_container_width=True)
 
 # Mapa com somatório por LOCAL
 st.subheader("🗺️ Mapa por Local")
