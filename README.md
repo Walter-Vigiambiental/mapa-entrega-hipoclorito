@@ -1,19 +1,14 @@
+# Georreferenciamento de Entregas de Hipoclorito
 
-# Mapa de Entrega de Hipoclorito
+Aplicativo em Streamlit que exibe um mapa interativo com dados de entrega de Hipoclorito georreferenciados.
 
-## Instruções
+## Funcionalidades
+- Mapa com entregas por coordenadas
+- Filtros por ano e mês
+- Atualização automática dos dados via planilha pública no Google Sheets
 
-1. Coloque o arquivo `dados.csv` (exportado do Google Sheets) na mesma pasta que este app.
-2. Rode o app com o comando:
-
-```bash
-streamlit run app.py
-```
-
-## Requisitos
-
-Instale os pacotes com:
+## Como executar
 
 ```bash
 pip install -r requirements.txt
-```
+streamlit run app.py

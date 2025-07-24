@@ -1,60 +1,35 @@
-
 import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import folium_static
-from folium.plugins import MarkerCluster
 
-st.set_page_config(page_title="Mapa de Entrega de Hipoclorito", layout="wide")
+# URL da planilha CSV publicada
+CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
-@st.cache_data
-def carregar_dados():
-    df = pd.read_csv("dados.csv")
-    df.columns = df.columns.str.strip().str.lower()
-    df = df.rename(columns={
-        "localidade": "localidade",
-        "latitude": "latitude",
-        "longitude": "longitude",
-        "data": "data",
-        "frascos": "quantidade",
-        "mês": "mes",
-        "ano": "ano"
-    })
+@st.cache_data(ttl=600)
+def load_data():
+    df = pd.read_csv(CSV_URL)
+    df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
+    df['Ano'] = df['Data'].dt.year
+    df['Mês'] = df['Data'].dt.month
+    return df.dropna(subset=['Latitude', 'Longitude'])
 
-    df['latitude'] = df['latitude'].astype(str).str.replace("Â", "", regex=False)
-    df['longitude'] = df['longitude'].astype(str).str.replace("Â", "", regex=False)
+df = load_data()
 
-    df = df.dropna(subset=["latitude", "longitude", "quantidade"])
-    df["latitude"] = df["latitude"].astype(float)
-    df["longitude"] = df["longitude"].astype(float)
-    df["quantidade"] = pd.to_numeric(df["quantidade"], errors="coerce").fillna(0).astype(int)
+st.title("📍 Mapa de Entregas de Hipoclorito")
+st.write("Filtre por ano e mês para visualizar as entregas georreferenciadas.")
 
-    return df
+# Filtros
+ano = st.selectbox("Filtrar por Ano", sorted(df['Ano'].dropna().unique()))
+mes = st.selectbox("Filtrar por Mês", sorted(df[df['Ano'] == ano]['Mês'].dropna().unique()))
+dados_filtrados = df[(df['Ano'] == ano) & (df['Mês'] == mes)]
 
-df = carregar_dados()
-
-st.sidebar.title("Filtros")
-
-anos = ["Todos"] + sorted(df["ano"].dropna().unique().astype(str).tolist())
-ano = st.sidebar.selectbox("Ano", anos)
-
-meses = ["Todos"] + sorted(df["mes"].dropna().unique().astype(str).tolist())
-mes = st.sidebar.selectbox("Mês", meses)
-
-if ano != "Todos":
-    df = df[df["ano"].astype(str) == ano]
-if mes != "Todos":
-    df = df[df["mes"].astype(str) == mes]
-
-m = folium.Map(location=[-7.2, -39.3], zoom_start=8)
-cluster = MarkerCluster().add_to(m)
-
-for _, row in df.iterrows():
-    popup = f"<b>{row['localidade']}</b><br>Entregue: {row['quantidade']} frascos<br>{row['mes']}/{row['ano']}"
+# Mapa
+m = folium.Map(location=[-17.89, -43.42], zoom_start=8)  # Centro aproximado de Montes Claros
+for _, row in dados_filtrados.iterrows():
     folium.Marker(
-        location=[row["latitude"], row["longitude"]],
-        popup=popup,
-        icon=folium.Icon(color="blue", icon="tint", prefix="fa")
-    ).add_to(cluster)
+        location=[row['Latitude'], row['Longitude']],
+        popup=f"{row['Local']} - {row['Quantidade']}L"
+    ).add_to(m)
 
 folium_static(m)
