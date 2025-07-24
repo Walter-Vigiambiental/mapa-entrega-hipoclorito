@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import folium
-import calendar
 from streamlit_folium import folium_static
 
 # URL da planilha pública
@@ -22,7 +21,7 @@ def load_data():
     df['LONGITUDE'] = pd.to_numeric(df['LONGITUDE'].str.strip(), errors='coerce')
     df['DATA'] = pd.to_datetime(df['DATA'], format="%d/%m/%Y", errors='coerce')
     df['Ano'] = df['DATA'].dt.year
-    df['Mês'] = df['DATA'].dt.month.astype('Int64')
+    df['Mês'] = df['DATA'].dt.month.astype("Int64")
     df['CAIXAS'] = pd.to_numeric(df['CAIXAS'], errors='coerce')
     df['FRASCOS'] = df['CAIXAS'] * 50
     if 'REMANESCENTES' in df.columns:
@@ -36,10 +35,12 @@ st.title("📦 Entregas e Estoques de Hipoclorito")
 st.write("Visualize os frascos entregues e estoques declarados por mês, ano e local.")
 
 # Filtros
-ano_opcoes = ["Todos"] + sorted(df['Ano'].dropna().unique().astype(str).tolist())
-ano_selecionado = st.selectbox("Filtrar por Ano", options=ano_opcoes)
+anos = sorted(df['Ano'].dropna().astype(int).unique())
+ano_opcoes = ["Todos"] + anos
+ano_selecionado = st.selectbox("Filtrar por Ano", options=["Todos"] + [str(a) for a in anos])
 
-mes_opcoes = ["Todos"] + sorted(df['Mês'].dropna().unique().tolist())
+meses = sorted(df['Mês'].dropna().unique())
+mes_opcoes = ["Todos"] + list(meses)
 mes_selecionados = st.multiselect(
     "Filtrar por Mês",
     options=mes_opcoes,
@@ -47,21 +48,20 @@ mes_selecionados = st.multiselect(
     format_func=lambda x: "Todos" if x == "Todos" else mes_format.get(x, str(x))
 )
 
-local_opcoes = ["Todos"] + sorted(df['LOCAL'].dropna().unique().tolist())
+locais = sorted(df['LOCAL'].dropna().unique())
+local_opcoes = ["Todos"] + locais
 local_selecionado = st.selectbox("Filtrar por Local", options=local_opcoes)
 
-# Filtros aplicados a entregas
+# Filtros aplicados a entregas (CAIXAS > 0)
 dados_entrega = df[df['CAIXAS'] > 0].copy()
 if ano_selecionado != "Todos":
-    ano_int = int(float(ano_selecionado))
-    dados_entrega = dados_entrega[dados_entrega['Ano'] == ano_int]
+    dados_entrega = dados_entrega[dados_entrega['Ano'] == int(ano_selecionado)]
 if "Todos" not in mes_selecionados:
-    meses_int = [int(m) for m in mes_selecionados]
-    dados_entrega = dados_entrega[dados_entrega['Mês'].isin(meses_int)]
+    dados_entrega = dados_entrega[dados_entrega['Mês'].isin([int(m) for m in mes_selecionados])]
 if local_selecionado != "Todos":
     dados_entrega = dados_entrega[dados_entrega['LOCAL'] == local_selecionado]
 
-# Tabela principal de entregas
+# Tabela de entregas
 total_frascos = dados_entrega['FRASCOS'].sum()
 st.subheader("📋 Entregas no período selecionado")
 st.write(f"**Total entregue:** {total_frascos:.0f} frascos")
@@ -86,14 +86,14 @@ st.dataframe(tabela_final, use_container_width=True, hide_index=True)
 # Estoques declarados
 df_estoque = df[df['REMANESCENTES'] > 0].copy()
 if ano_selecionado != "Todos":
-    df_estoque = df_estoque[df_estoque['Ano'] == int(float(ano_selecionado))]
+    df_estoque = df_estoque[df_estoque['Ano'] == int(ano_selecionado)]
 if "Todos" not in mes_selecionados:
     df_estoque = df_estoque[df_estoque['Mês'].isin([int(m) for m in mes_selecionados])]
 if local_selecionado != "Todos":
     df_estoque = df_estoque[df_estoque['LOCAL'] == local_selecionado]
 
 df_estoque['MÊS_ANO'] = df_estoque.apply(
-    lambda row: f"{mes_format.get(row['Mês'], '')} {row['Ano']}", axis=1
+    lambda row: f"{mes_format.get(row['Mês'], '')} {int(row['Ano'])}", axis=1
 )
 
 st.subheader("🧴 Locais com hipoclorito em estoque declarado")
@@ -113,8 +113,8 @@ agrupados = dados_entrega.groupby(['LOCAL', 'LATITUDE', 'LONGITUDE'])['FRASCOS']
 for _, row in agrupados.iterrows():
     lat = float(row['LATITUDE'])
     lon = float(row['LONGITUDE'])
-    popup_text = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues"
-    folium.Marker(location=[lat, lon], popup=popup_text).add_to(m)
+    texto = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues"
+    folium.Marker(location=[lat, lon], popup=texto).add_to(m)
 folium_static(m)
 
 # Mapa de estoques
