@@ -4,7 +4,7 @@ import folium
 import calendar
 from streamlit_folium import folium_static
 
-# URL da planilha CSV publicada
+# URL pública do CSV hospedado no Google Sheets
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
 @st.cache_data(ttl=600)
@@ -12,7 +12,7 @@ def load_data():
     df = pd.read_csv(CSV_URL)
     df.columns = df.columns.str.strip()
 
-    # Extrair LATITUDE e LONGITUDE da coluna COORDENADAS
+    # Extrair LATITUDE e LONGITUDE a partir da coluna COORDENADAS
     if 'COORDENADAS' in df.columns:
         df[['LATITUDE', 'LONGITUDE']] = df['COORDENADAS'].str.split(',', expand=True)
         df['LATITUDE'] = pd.to_numeric(df['LATITUDE'].str.strip(), errors='coerce')
@@ -46,8 +46,15 @@ ano_selecionado = st.selectbox("Filtrar por Ano", options=ano_opcoes)
 # Filtro por Mês
 meses_disponiveis = sorted(df['Mês'].dropna().unique())
 mes_opcoes = ["Todos"] + list(meses_disponiveis)
-mes_format = {m: calendar.month_name[m] for m in meses_disponiveis}
-mes_selecionado = st.selectbox("Filtrar por Mês", options=mes_opcoes, format_func=lambda x: "Todos" if x == "Todos" else mes_format.get(x, str(x)))
+mes_format = {
+    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
+    7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+}
+mes_selecionado = st.selectbox(
+    "Filtrar por Mês",
+    options=mes_opcoes,
+    format_func=lambda x: "Todos" if x == "Todos" else mes_format.get(x, str(x))
+)
 
 # Filtro por Local
 locais_disponiveis = sorted(df['LOCAL'].dropna().unique())
@@ -81,9 +88,12 @@ total_frascos = dados['FRASCOS'].sum()
 st.subheader("📋 Dados filtrados")
 st.write(f"**Total entregue:** {total_frascos:.0f} frascos")
 
-# Exibir Data como "Janeiro 2024"
+# Exibir DATA como "Janeiro 2024"
 df_exibicao = dados.copy()
-df_exibicao['DATA'] = df_exibicao['DATA'].dt.strftime("%B %Y")
+df_exibicao['DATA'] = df_exibicao.apply(
+    lambda row: f"{mes_format.get(row['Mês'], '')} {int(row['Ano'])}" if pd.notnull(row['DATA']) else "",
+    axis=1
+)
 st.dataframe(df_exibicao[['DATA', 'LOCAL', 'CAIXAS', 'FRASCOS', 'LATITUDE', 'LONGITUDE']])
 
 # Mapa
