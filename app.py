@@ -25,11 +25,14 @@ mes = st.selectbox("Filtrar por Mês", sorted(df[df['Ano'] == ano]['Mês'].dropn
 dados_filtrados = df[(df['Ano'] == ano) & (df['Mês'] == mes)]
 
 # Construção do mapa
-m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
+m = folium.Map(location=[-17.89, -43.42], zoom_start=8)  # Centro aproximado de Montes Claros
 for _, row in dados_filtrados.iterrows():
-    folium.Marker(
-        location=[row['LATITUDE'], row['LONGITUDE']],
-        popup=f"{row['LOCAL']} - {row['QUANTIDADE']}L"
-    ).add_to(m)
+    try:
+        lat = float(row['LATITUDE'])
+        lon = float(row['LONGITUDE'])
+        popup_text = f"{row['LOCAL']} - {row['QUANTIDADE']}L"
+        folium.Marker(location=[lat, lon], popup=popup_text).add_to(m)
+    except (ValueError, TypeError, KeyError):
+        continue  # ignora linhas com dados inválidos
 
 folium_static(m)
