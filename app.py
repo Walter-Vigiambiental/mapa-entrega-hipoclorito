@@ -85,22 +85,24 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True)
 
-# Estoques declarados no período sem entrega posterior
+# Estoques com data posterior à última entrega no período filtrado
 if 'REMANESCENTES' in dados.columns:
     dados['REMANESCENTES'] = pd.to_numeric(dados['REMANESCENTES'], errors='coerce').fillna(0)
 
     estoque_bruto = dados[dados['REMANESCENTES'] > 0][['LOCAL', 'REMANESCENTES', 'DATA', 'LATITUDE', 'LONGITUDE']]
-    entregas_no_periodo = dados[dados['FRASCOS'] > 0][['LOCAL', 'DATA']].groupby('LOCAL')['DATA'].max().reset_index()
-    estoque_validado = pd.merge(estoque_bruto, entregas_no_periodo, on='LOCAL', how='left', suffixes=('', '_ENTREGA'))
-    estoque_validado = estoque_validado[
-        (estoque_validado['DATA'] > estoque_validado['DATA_ENTREGA']) | (estoque_validado['DATA_ENTREGA'].isna())
-    ].drop(columns=['DATA_ENTREGA'])
+    entregas_periodo = dados[dados['FRASCOS'] > 0][['LOCAL', 'DATA']].groupby('LOCAL')['DATA'].max().reset_index()
+    entregas_periodo.rename(columns={'DATA': 'ULTIMA_ENTREGA'}, inplace=True)
 
-    st.subheader("🧴 Locais com hipoclorito em estoque declarado")
+    estoque_validado = pd.merge(estoque_bruto, entregas_periodo, on='LOCAL', how='left')
+    estoque_validado = estoque_validado[
+        (estoque_validado['DATA'] > estoque_validado['ULTIMA_ENTREGA']) | (estoque_validado['ULTIMA_ENTREGA'].isna())
+    ].drop(columns=['ULTIMA_ENTREGA'])
+
+    st.subheader("🧴 Locais com hipoclorito em estoque declarado (pós-entrega)")
     if not estoque_validado.empty:
         st.dataframe(estoque_validado[['LOCAL', 'REMANESCENTES']].sort_values(by='REMANESCENTES', ascending=False), use_container_width=True)
     else:
-        st.info("✅ Não há estoque declarado para este período.")
+        st.info("✅ Não há estoque declarado após a última entrega registrada no período.")
 else:
     st.warning("⚠️ Campo 'REMANESCENTES' não encontrado nos dados.")
 
@@ -117,8 +119,8 @@ folium_static(m)
 
 # Mapa de estoques
 if not estoque_validado.empty:
-    st.subheader("🗺️ Estoques de hipoclorito (Remanescentes > 0)")
-    mapa_remanescentes = folium.Map(location=[-17.89, -43.42], zoom_start=8)
+    st.subheader("🗺️ Estoques visíveis (Remanescentes registrados após entrega)")
+    mapa_remanescente = folium.Map(location=[-17.89, -43.42], zoom_start=8)
     for _, row in estoque_validado.iterrows():
         lat = float(row['LATITUDE'])
         lon = float(row['LONGITUDE'])
@@ -132,5 +134,5 @@ if not estoque_validado.empty:
             fill_color='orange',
             fill_opacity=0.7,
             popup=texto
-        ).add_to(mapa_remanescentes)
-    folium_static(mapa_remanescentes)
+        ).add_to(mapa_remanescente)
+    folium_static(mapa_remanescente)
