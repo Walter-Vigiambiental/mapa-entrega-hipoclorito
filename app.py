@@ -5,6 +5,7 @@ from streamlit_folium import folium_static
 
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
+# Dicionário mês em português-BR
 mes_format = {
     1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril", 5: "maio", 6: "junho",
     7: "julho", 8: "agosto", 9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
@@ -74,6 +75,7 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True, hide_index=True)
 
+# Estoques filtrados
 df_estoque = df[df['REMANESCENTES'] > 0].copy()
 if ano_selecionado != "Todos":
     df_estoque = df_estoque[df_estoque['Ano'] == int(ano_selecionado)]
@@ -88,20 +90,21 @@ df_estoque = df_estoque[
     (df_estoque['DATA'] >= df_estoque['ULTIMA_ENTREGA']) | (df_estoque['ULTIMA_ENTREGA'].isna())
 ].copy()
 
-# Criação robusta do campo DATA_ESTOQUE e MÊS_ANO
+# Criar MÊS_ANO com tradução correta e ordenação segura
 df_estoque = df_estoque.dropna(subset=['Ano', 'Mês'])
 df_estoque['Ano'] = pd.to_numeric(df_estoque['Ano'], errors='coerce').astype('Int64')
 df_estoque['Mês'] = pd.to_numeric(df_estoque['Mês'], errors='coerce').astype('Int64')
 df_estoque = df_estoque.dropna(subset=['Ano', 'Mês'])
-
 df_estoque['DATA_ESTOQUE'] = pd.to_datetime({
     'year': df_estoque['Ano'],
     'month': df_estoque['Mês'],
     'day': 1
 }, errors='coerce')
-
 df_estoque = df_estoque.dropna(subset=['DATA_ESTOQUE'])
-df_estoque['MÊS_ANO'] = df_estoque['DATA_ESTOQUE'].dt.strftime('%B %Y').str.capitalize()
+df_estoque['MÊS_ANO'] = df_estoque.apply(
+    lambda row: f"{mes_format.get(row['Mês'], '')} {int(row['Ano'])}".capitalize(),
+    axis=1
+)
 df_estoque = df_estoque.sort_values(by='DATA_ESTOQUE')
 
 st.subheader("🧴 Locais com hipoclorito em estoque declarado")
