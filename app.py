@@ -7,7 +7,7 @@ from streamlit_folium import folium_static
 # URL da planilha pública
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
-# Meses em português
+# Mapeamento de meses
 mes_format = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
     7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
@@ -50,7 +50,7 @@ mes_selecionados = st.multiselect(
 local_opcoes = ["Todos"] + sorted(df['LOCAL'].dropna().unique().tolist())
 local_selecionado = st.selectbox("Filtrar por Local", options=local_opcoes)
 
-# Filtros aplicados a entregas (CAIXAS > 0)
+# Filtros aplicados a entregas
 dados_entrega = df[df['CAIXAS'] > 0].copy()
 if ano_selecionado != "Todos":
     ano_int = int(float(ano_selecionado))
@@ -92,9 +92,17 @@ if "Todos" not in mes_selecionados:
 if local_selecionado != "Todos":
     df_estoque = df_estoque[df_estoque['LOCAL'] == local_selecionado]
 
+df_estoque['MÊS_ANO'] = df_estoque.apply(
+    lambda row: f"{mes_format.get(row['Mês'], '')} {row['Ano']}", axis=1
+)
+
 st.subheader("🧴 Locais com hipoclorito em estoque declarado")
 if not df_estoque.empty:
-    st.dataframe(df_estoque[['LOCAL', 'REMANESCENTES']].drop_duplicates().sort_values(by='REMANESCENTES', ascending=False), use_container_width=True, hide_index=True)
+    st.dataframe(
+        df_estoque[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']].drop_duplicates().sort_values(by='REMANESCENTES', ascending=False),
+        use_container_width=True,
+        hide_index=True
+    )
 else:
     st.info("✅ Nenhum estoque declarado para este filtro.")
 
