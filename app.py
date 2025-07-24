@@ -6,7 +6,7 @@ from streamlit_folium import folium_static
 # URL da planilha pública
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
-# Mapeamento de meses
+# Meses em português
 mes_format = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
     7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
@@ -36,23 +36,20 @@ st.write("Visualize os frascos entregues e estoques declarados por mês, ano e l
 
 # Filtros
 anos = sorted(df['Ano'].dropna().astype(int).unique())
-ano_opcoes = ["Todos"] + anos
 ano_selecionado = st.selectbox("Filtrar por Ano", options=["Todos"] + [str(a) for a in anos])
 
 meses = sorted(df['Mês'].dropna().unique())
-mes_opcoes = ["Todos"] + list(meses)
 mes_selecionados = st.multiselect(
     "Filtrar por Mês",
-    options=mes_opcoes,
+    options=["Todos"] + list(meses),
     default=["Todos"],
     format_func=lambda x: "Todos" if x == "Todos" else mes_format.get(x, str(x))
 )
 
 locais = sorted(df['LOCAL'].dropna().unique())
-local_opcoes = ["Todos"] + locais
-local_selecionado = st.selectbox("Filtrar por Local", options=local_opcoes)
+local_selecionado = st.selectbox("Filtrar por Local", options=["Todos"] + locais)
 
-# Filtros aplicados a entregas (CAIXAS > 0)
+# Filtro: entregas
 dados_entrega = df[df['CAIXAS'] > 0].copy()
 if ano_selecionado != "Todos":
     dados_entrega = dados_entrega[dados_entrega['Ano'] == int(ano_selecionado)]
@@ -83,7 +80,7 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True, hide_index=True)
 
-# Estoques declarados
+# Estoques declarados após a entrega mais recente
 df_estoque = df[df['REMANESCENTES'] > 0].copy()
 if ano_selecionado != "Todos":
     df_estoque = df_estoque[df_estoque['Ano'] == int(ano_selecionado)]
@@ -92,27 +89,29 @@ if "Todos" not in mes_selecionados:
 if local_selecionado != "Todos":
     df_estoque = df_estoque[df_estoque['LOCAL'] == local_selecionado]
 
-# Verificar última entrega por local
+# Ocultar estoques anteriores à entrega mais recente
 entregas_recentes = dados_entrega.groupby('LOCAL')['DATA'].max().reset_index().rename(columns={'DATA': 'ULTIMA_ENTREGA'})
 df_estoque = pd.merge(df_estoque, entregas_recentes, on='LOCAL', how='left')
-
-# Mostrar somente estoques registrados após a última entrega (ou sem entrega)
 df_estoque = df_estoque[
     (df_estoque['DATA'] >= df_estoque['ULTIMA_ENTREGA']) | (df_estoque['ULTIMA_ENTREGA'].isna())
 ].copy()
 
-# Gerar campo MÊS_ANO
+# Geração do campo MÊS_ANO e DATA_ESTOQUE
 if not df_estoque.empty and 'Ano' in df_estoque.columns and 'Mês' in df_estoque.columns:
     df_estoque['MÊS_ANO'] = df_estoque.apply(
         lambda row: f"{mes_format.get(row['Mês'], '')} {int(row['Ano'])}", axis=1
     )
+    df_estoque['DATA_ESTOQUE'] = pd.to_datetime(
+        df_estoque[['Ano', 'Mês']].assign(DIA=1), errors='coerce'
+    )
+    df_estoque = df_estoque.sort_values(by='DATA_ESTOQUE')
 else:
     df_estoque['MÊS_ANO'] = ""
 
 st.subheader("🧴 Locais com hipoclorito em estoque declarado")
 if not df_estoque.empty:
     st.dataframe(
-        df_estoque[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']].drop_duplicates().sort_values(by='REMANESCENTES', ascending=False),
+        df_estoque[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']].drop_duplicates(),
         use_container_width=True,
         hide_index=True
     )
@@ -126,8 +125,8 @@ agrupados = dados_entrega.groupby(['LOCAL', 'LATITUDE', 'LONGITUDE'])['FRASCOS']
 for _, row in agrupados.iterrows():
     lat = float(row['LATITUDE'])
     lon = float(row['LONGITUDE'])
-    texto = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues"
-    folium.Marker(location=[lat, lon], popup=texto).add_to(m)
+    popup_text = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues"
+    folium.Marker(location=[lat, lon], popup=popup_text).add_to(m)
 folium_static(m)
 
 # Mapa de estoques
