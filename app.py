@@ -4,7 +4,7 @@ import folium
 import calendar
 from streamlit_folium import folium_static
 
-# URL pública do CSV
+# Link do CSV no Google Sheets
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
 @st.cache_data(ttl=600)
@@ -12,21 +12,17 @@ def load_data():
     df = pd.read_csv(CSV_URL)
     df.columns = df.columns.str.strip()
 
-    # Separar LATITUDE e LONGITUDE a partir da coluna COORDENADAS
-    if 'COORDENADAS' in df.columns:
-        df[['LATITUDE', 'LONGITUDE']] = df['COORDENADAS'].str.split(',', expand=True)
-        df['LATITUDE'] = pd.to_numeric(df['LATITUDE'].str.strip(), errors='coerce')
-        df['LONGITUDE'] = pd.to_numeric(df['LONGITUDE'].str.strip(), errors='coerce')
-    else:
-        st.error("Coluna 'COORDENADAS' não encontrada.")
-        st.stop()
+    # Extrair LATITUDE e LONGITUDE a partir da coluna COORDENADAS
+    df[['LATITUDE', 'LONGITUDE']] = df['COORDENADAS'].str.split(',', expand=True)
+    df['LATITUDE'] = pd.to_numeric(df['LATITUDE'].str.strip(), errors='coerce')
+    df['LONGITUDE'] = pd.to_numeric(df['LONGITUDE'].str.strip(), errors='coerce')
 
     df['DATA'] = pd.to_datetime(df['DATA'], format="%d/%m/%Y", errors='coerce')
     df['Ano'] = df['DATA'].dt.year
     df['Mês'] = df['DATA'].dt.month.astype('Int64')
 
     df['CAIXAS'] = pd.to_numeric(df['CAIXAS'], errors='coerce')
-    df['FRASCOS'] = df['CAIXAS'] * 50  # Assumindo 50 frascos por caixa
+    df['FRASCOS'] = df['CAIXAS'] * 50  # 50 frascos por caixa
 
     df = df.dropna(subset=['LATITUDE', 'LONGITUDE'])
 
@@ -35,20 +31,27 @@ def load_data():
 df = load_data()
 
 st.title("📦 Entregas de Hipoclorito")
-st.write("Visualize os frascos entregues por mês e ano.")
+st.write("Visualize os frascos entregues por mês, ano e local.")
 
-# Filtros com opção "Todos"
+# Filtro por Ano
 anos_disponiveis = sorted(df['Ano'].dropna().unique())
 ano_opcoes = ["Todos"] + [str(a) for a in anos_disponiveis]
 ano_selecionado = st.selectbox("Filtrar por Ano", options=ano_opcoes)
 
+# Filtro por Mês
 meses_disponiveis = sorted(df['Mês'].dropna().unique())
 mes_opcoes = ["Todos"] + list(meses_disponiveis)
 mes_format = {m: calendar.month_name[m] for m in meses_disponiveis}
 mes_selecionado = st.selectbox("Filtrar por Mês", options=mes_opcoes, format_func=lambda x: "Todos" if x == "Todos" else mes_format.get(x, str(x)))
 
+# Filtro por Local
+locais_disponiveis = sorted(df['LOCAL'].dropna().unique())
+local_opcoes = ["Todos"] + locais_disponiveis
+local_selecionado = st.selectbox("Filtrar por Local", options=local_opcoes)
+
 # Aplicar filtros
 dados = df.copy()
+
 if ano_selecionado != "Todos":
     try:
         ano_int = int(float(ano_selecionado))
@@ -56,6 +59,7 @@ if ano_selecionado != "Todos":
     except:
         st.error("Erro ao interpretar o ano selecionado.")
         st.stop()
+
 if mes_selecionado != "Todos":
     try:
         mes_int = int(mes_selecionado)
@@ -63,6 +67,9 @@ if mes_selecionado != "Todos":
     except:
         st.error("Erro ao interpretar o mês selecionado.")
         st.stop()
+
+if local_selecionado != "Todos":
+    dados = dados[dados['LOCAL'] == local_selecionado]
 
 # Somatório
 total_frascos = dados['FRASCOS'].sum()
@@ -75,7 +82,7 @@ st.dataframe(dados[['DATA', 'LOCAL', 'CAIXAS', 'FRASCOS', 'LATITUDE', 'LONGITUDE
 m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
 
 if dados.empty:
-    st.warning("⚠️ Nenhuma entrega encontrada para o período selecionado.")
+    st.warning("⚠️ Nenhuma entrega encontrada para os filtros selecionados.")
 else:
     for _, row in dados.iterrows():
         try:
@@ -83,7 +90,7 @@ else:
             lon = float(row['LONGITUDE'])
             popup_text = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos"
             folium.Marker(location=[lat, lon], popup=popup_text).add_to(m)
-        except Exception:
+        except:
             continue
 
     folium_static(m)
