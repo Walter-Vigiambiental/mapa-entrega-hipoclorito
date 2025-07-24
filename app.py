@@ -9,10 +9,10 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys
 @st.cache_data(ttl=600)
 def load_data():
     df = pd.read_csv(CSV_URL)
-    df['DATA'] = pd.to_datetime(df['DATA'], errors='coerce')  # Ajuste do nome da coluna
+    df['DATA'] = pd.to_datetime(df['DATA'], errors='coerce')
     df['Ano'] = df['DATA'].dt.year
     df['Mês'] = df['DATA'].dt.month
-    return df.dropna(subset=['LATITUDE', 'LONGITUDE'])  # Ajuste do nome das colunas
+    return df.dropna(subset=['LATITUDE', 'LONGITUDE'])
 
 df = load_data()
 
@@ -25,11 +25,11 @@ mes = st.selectbox("Filtrar por Mês", sorted(df[df['Ano'] == ano]['Mês'].dropn
 dados_filtrados = df[(df['Ano'] == ano) & (df['Mês'] == mes)]
 
 # Construção do mapa
-m = folium.Map(location=[-17.89, -43.42], zoom_start=8)  # Ponto central: Montes Claros
+m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
 for _, row in dados_filtrados.iterrows():
     folium.Marker(
         location=[row['LATITUDE'], row['LONGITUDE']],
-        popup=f"{row['Local']} - {row['Quantidade']}L"
+        popup=f"{row['LOCAL']} - {row['QUANTIDADE']}L"
     ).add_to(m)
 
 folium_static(m)
