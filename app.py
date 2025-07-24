@@ -3,8 +3,10 @@ import pandas as pd
 import folium
 from streamlit_folium import folium_static
 
+# Fonte dos dados
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
+# Meses em português
 mes_format = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
     7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
@@ -25,7 +27,6 @@ def load_data():
     if 'REMANESCENTES' in df.columns:
         df['REMANESCENTES'] = pd.to_numeric(df['REMANESCENTES'], errors='coerce').fillna(0)
     df = df.dropna(subset=['LATITUDE', 'LONGITUDE'])
-    df = df[df['CAIXAS'] > 0]
     return df
 
 df = load_data()
@@ -48,13 +49,13 @@ mes_selecionados = st.multiselect(
 local_opcoes = ["Todos"] + sorted(df['LOCAL'].dropna().unique().tolist())
 local_selecionado = st.selectbox("Filtrar por Local", options=local_opcoes)
 
+# Aplicar filtros
 dados = df.copy()
 if ano_selecionado != "Todos":
     try:
-        ano_int = int(float(ano_selecionado))
-        dados = dados[dados['Ano'] == ano_int]
+        dados = dados[dados['Ano'] == int(ano_selecionado)]
     except ValueError:
-        st.error("Erro: valor de ano inválido.")
+        st.error("Erro: ano inválido.")
         st.stop()
 
 if "Todos" not in mes_selecionados:
@@ -85,45 +86,45 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True)
 
-# Estoques filtrados e cruzados com entregas
+# Estoques declarados dentro do período filtrado sem entrega posterior
 if 'REMANESCENTES' in dados.columns:
     dados['REMANESCENTES'] = pd.to_numeric(dados['REMANESCENTES'], errors='coerce').fillna(0)
 
     estoque_bruto = dados[dados['REMANESCENTES'] > 0][['LOCAL', 'REMANESCENTES', 'DATA', 'LATITUDE', 'LONGITUDE']]
-    entregas_recentes = dados[dados['FRASCOS'] > 0].groupby('LOCAL')['DATA'].max().reset_index()
-    estoque_validado = pd.merge(estoque_bruto, entregas_recentes, on='LOCAL', how='left', suffixes=('', '_ENTREGA'))
+    entregas_no_periodo = dados[dados['FRASCOS'] > 0][['LOCAL', 'DATA']].groupby('LOCAL')['DATA'].max().reset_index()
+    estoque_validado = pd.merge(estoque_bruto, entregas_no_periodo, on='LOCAL', how='left', suffixes=('', '_ENTREGA'))
     estoque_validado = estoque_validado[
         (estoque_validado['DATA'] > estoque_validado['DATA_ENTREGA']) | (estoque_validado['DATA_ENTREGA'].isna())
     ].drop(columns=['DATA_ENTREGA'])
 
-    st.subheader("🧴 Locais com hipoclorito em estoque declarado (sem entrega posterior)")
+    st.subheader("🧴 Locais com hipoclorito em estoque declarado")
     if not estoque_validado.empty:
         st.dataframe(estoque_validado[['LOCAL', 'REMANESCENTES']].sort_values(by='REMANESCENTES', ascending=False), use_container_width=True)
     else:
-        st.info("✅ Nenhum estoque válido após entregas no período selecionado.")
+        st.info("✅ Não há estoque declarado para este período.")
 else:
     st.warning("⚠️ Campo 'REMANESCENTES' não encontrado nos dados.")
 
 # Mapa de entregas
 st.subheader("🗺️ Mapa de Entregas por Local")
 m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
-agrupados = dados.groupby(['LOCAL', 'LATITUDE', 'LONGITUDE'])['FRASCOS'].sum().reset_index()
+agrupados = dados[dados['FRASCOS'] > 0].groupby(['LOCAL', 'LATITUDE', 'LONGITUDE'])['FRASCOS'].sum().reset_index()
 for _, row in agrupados.iterrows():
     lat = float(row['LATITUDE'])
     lon = float(row['LONGITUDE'])
-    popup_text = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues"
-    folium.Marker(location=[lat, lon], popup=popup_text).add_to(m)
+    texto = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues"
+    folium.Marker(location=[lat, lon], popup=texto).add_to(m)
 folium_static(m)
 
-# Mapa de estoques
+# Mapa de estoques remanescentes
 if not estoque_validado.empty:
-    st.subheader("🗺️ Estoques visíveis no mapa (Remanescentes > 0)")
-    mapa_remanescente = folium.Map(location=[-17.89, -43.42], zoom_start=8)
+    st.subheader("🗺️ Estoques de hipoclorito (Remanescentes > 0)")
+    mapa_remanescentes = folium.Map(location=[-17.89, -43.42], zoom_start=8)
     for _, row in estoque_validado.iterrows():
         lat = float(row['LATITUDE'])
         lon = float(row['LONGITUDE'])
         estoque = int(row['REMANESCENTES'])
-        popup_text = f"{row['LOCAL']} - {estoque} frascos em estoque"
+        texto = f"{row['LOCAL']} - {estoque} frascos em estoque"
         folium.CircleMarker(
             location=[lat, lon],
             radius=8,
@@ -131,6 +132,6 @@ if not estoque_validado.empty:
             fill=True,
             fill_color='orange',
             fill_opacity=0.7,
-            popup=popup_text
-        ).add_to(mapa_remanescente)
-    folium_static(mapa_remanescente)
+            popup=texto
+        ).add_to(mapa_remanescentes)
+    folium_static(mapa_remanescentes)
