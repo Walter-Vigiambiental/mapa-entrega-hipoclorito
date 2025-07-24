@@ -4,7 +4,7 @@ import folium
 import calendar
 from streamlit_folium import folium_static
 
-# URL do CSV
+# URL da planilha pública
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
 # Tradução dos meses para português
@@ -17,23 +17,16 @@ mes_format = {
 def load_data():
     df = pd.read_csv(CSV_URL)
     df.columns = df.columns.str.strip()
-
-    # Coordenadas
     df[['LATITUDE', 'LONGITUDE']] = df['COORDENADAS'].str.split(',', expand=True)
     df['LATITUDE'] = pd.to_numeric(df['LATITUDE'].str.strip(), errors='coerce')
     df['LONGITUDE'] = pd.to_numeric(df['LONGITUDE'].str.strip(), errors='coerce')
-
-    # Datas e quantidades
     df['DATA'] = pd.to_datetime(df['DATA'], format="%d/%m/%Y", errors='coerce')
     df['Ano'] = df['DATA'].dt.year
     df['Mês'] = df['DATA'].dt.month.astype('Int64')
     df['CAIXAS'] = pd.to_numeric(df['CAIXAS'], errors='coerce')
     df['FRASCOS'] = df['CAIXAS'] * 50
-
-    # Remover registros incompletos ou sem entregas
     df = df.dropna(subset=['LATITUDE', 'LONGITUDE'])
     df = df[df['CAIXAS'] > 0]
-
     return df
 
 df = load_data()
@@ -41,7 +34,6 @@ df = load_data()
 st.title("📦 Entregas de Hipoclorito")
 st.write("Visualize os frascos entregues por mês, ano e local.")
 
-# Filtros
 anos = sorted(df['Ano'].dropna().unique())
 ano_opcoes = ["Todos"] + [str(a) for a in anos]
 ano_selecionado = st.selectbox("Filtrar por Ano", options=ano_opcoes)
@@ -72,7 +64,7 @@ if "Todos" not in mes_selecionados:
 if local_selecionado != "Todos":
     dados = dados[dados['LOCAL'] == local_selecionado]
 
-# Dados filtrados
+# Total filtrado
 total_frascos = dados['FRASCOS'].sum()
 st.subheader("📋 Dados filtrados")
 st.write(f"**Total entregue:** {total_frascos:.0f} frascos")
@@ -95,19 +87,19 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True)
 
-# Tabela de remanescentes
+# Tabela de estoque: locais com entregas anteriores mas não neste filtro
 locais_com_entregas = df['LOCAL'].dropna().unique()
 locais_atuais = dados['LOCAL'].dropna().unique()
 locais_remanescentes = sorted(set(locais_com_entregas) - set(locais_atuais))
 
+st.subheader("🧴 Locais com hipoclorito em estoque (Não entregues)")
 if locais_remanescentes:
-    st.subheader("📌 Locais sem entregas no período selecionado")
     df_remanescentes = pd.DataFrame({'LOCAL': locais_remanescentes})
     st.dataframe(df_remanescentes, use_container_width=True)
 else:
-    st.info("✅ Todas as comunidades com entregas históricas estão contempladas neste período.")
+    st.info("✅ Não há locais com hipoclorito em estoque para este período.")
 
-# Mapa com somatório por LOCAL
+# Mapa com total por local
 st.subheader("🗺️ Mapa por Local")
 m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
 
