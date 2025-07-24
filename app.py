@@ -98,16 +98,17 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True)
 
-# Remanescentes reais: estoques declarados
-if 'REMANESCENTES' in df.columns:
-    df_estoque = df[df['REMANESCENTES'] > 0][['LOCAL', 'REMANESCENTES']].drop_duplicates()
+# Estoques declarados dentro do período filtrado
+if 'REMANESCENTES' in dados.columns:
+    df_estoque = dados[dados['REMANESCENTES'] > 0][['LOCAL', 'REMANESCENTES']].drop_duplicates()
+    
     st.subheader("🧴 Locais com hipoclorito em estoque declarado")
     if not df_estoque.empty:
         st.dataframe(df_estoque.sort_values(by='REMANESCENTES', ascending=False), use_container_width=True)
     else:
-        st.info("✅ Nenhum estoque declarado no campo 'REMANESCENTES'.")
+        st.info("✅ Nenhum estoque declarado para este período.")
 else:
-    st.warning("⚠️ Campo 'REMANESCENTES' não encontrado na planilha.")
+    st.warning("⚠️ Campo 'REMANESCENTES' não encontrado nos dados.")
 
 # Mapa por LOCAL
 st.subheader("🗺️ Mapa por Local")
