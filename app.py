@@ -7,7 +7,7 @@ from streamlit_folium import folium_static
 # URL da planilha pública
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
-# Mapeamento de meses
+# Meses em português
 mes_format = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
     7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
@@ -33,7 +33,7 @@ def load_data():
 df = load_data()
 
 st.title("📦 Entregas e Estoques de Hipoclorito")
-st.write("Visualize os frascos entregues, estoques declarados e saldo acumulado por mês, ano e local.")
+st.write("Visualize os frascos entregues e estoques declarados por mês, ano e local.")
 
 # Filtros
 ano_opcoes = ["Todos"] + sorted(df['Ano'].dropna().unique().astype(str).tolist())
@@ -83,7 +83,7 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True, hide_index=True)
 
-# Estoques declarados (REMANESCENTES > 0)
+# Estoques declarados
 df_estoque = df[df['REMANESCENTES'] > 0].copy()
 if ano_selecionado != "Todos":
     df_estoque = df_estoque[df_estoque['Ano'] == int(float(ano_selecionado))]
@@ -128,17 +128,3 @@ if not df_estoque.empty:
             popup=texto_popup
         ).add_to(mapa_estoque)
     folium_static(mapa_estoque)
-
-# 🔢 Saldo acumulado por local
-st.subheader("📊 Saldo acumulado por local (Entregue - Estoque atual)")
-
-entregas_por_local = dados_entrega.groupby('LOCAL')['FRASCOS'].sum().reset_index().rename(columns={'FRASCOS': 'TOTAL_ENTREGUE'})
-estoque_por_local = df_estoque.groupby('LOCAL')['REMANESCENTES'].sum().reset_index()
-saldo = pd.merge(entregas_por_local, estoque_por_local, on='LOCAL', how='outer').fillna(0)
-saldo['SALDO_ACUMULADO'] = saldo['TOTAL_ENTREGUE'] - saldo['REMANESCENTES']
-saldo = saldo[['LOCAL', 'TOTAL_ENTREGUE', 'REMANESCENTES', 'SALDO_ACUMULADO']].sort_values(by='SALDO_ACUMULADO', ascending=False)
-
-if not saldo.empty:
-    st.dataframe(saldo, use_container_width=True, hide_index=True)
-else:
-    st.info("✅ Nenhum dado disponível para análise de saldo.")
