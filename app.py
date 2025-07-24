@@ -24,7 +24,9 @@ def load_data():
     df['Ano'] = df['DATA'].dt.year
     df['Mês'] = df['DATA'].dt.month.astype('Int64')
 
-    df['QUANTIDADE'] = pd.to_numeric(df['QUANTIDADE'], errors='coerce')
+    # Calcular número de frascos entregues
+    df['CAIXAS'] = pd.to_numeric(df['CAIXAS'], errors='coerce')
+    df['FRASCOS'] = df['CAIXAS'] * 50  # Assumindo 50 frascos por caixa
 
     df = df.dropna(subset=['LATITUDE', 'LONGITUDE'])
 
@@ -33,7 +35,7 @@ def load_data():
 df = load_data()
 
 st.title("📍 Mapa de Entregas de Hipoclorito")
-st.write("Visualize as entregas georreferenciadas por mês e ano.")
+st.write("Visualize os frascos entregues por mês e ano.")
 
 # Filtros interativos com "Todos"
 anos_disponiveis = sorted(df['Ano'].dropna().unique())
@@ -53,12 +55,11 @@ if mes_selecionado != "Todos":
     dados = dados[dados['Mês'] == int(mes_selecionado)]
 
 # Somatório
-total_litros = dados['QUANTIDADE'].sum()
+total_frascos = dados['FRASCOS'].sum()
 
 st.subheader("📋 Dados filtrados")
-st.write(f"**Total entregue:** {total_litros:.0f} litros")
-
-st.dataframe(dados[['DATA', 'LOCAL', 'QUANTIDADE', 'LATITUDE', 'LONGITUDE']])
+st.write(f"**Total entregue:** {total_frascos:.0f} frascos")
+st.dataframe(dados[['DATA', 'LOCAL', 'CAIXAS', 'FRASCOS', 'LATITUDE', 'LONGITUDE']])
 
 # Mapa interativo
 m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
@@ -70,7 +71,7 @@ else:
         try:
             lat = float(row['LATITUDE'])
             lon = float(row['LONGITUDE'])
-            texto_popup = f"{row['LOCAL']} - {row['QUANTIDADE']}L"
+            texto_popup = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos"
             folium.Marker(location=[lat, lon], popup=texto_popup).add_to(m)
         except Exception:
             continue
