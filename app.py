@@ -11,26 +11,27 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys
 def load_data():
     df = pd.read_csv(CSV_URL)
 
-    # Remover espaços dos nomes das colunas
+    # Limpar nomes de colunas
     df.columns = df.columns.str.strip()
 
-    # Verificar se colunas essenciais existem
-    required_cols = ['DATA', 'LATITUDE', 'LONGITUDE', 'LOCAL', 'QUANTIDADE']
-    for col in required_cols:
+    # Verificar colunas obrigatórias
+    obrigatorias = ['DATA', 'LATITUDE', 'LONGITUDE', 'LOCAL', 'QUANTIDADE']
+    for col in obrigatorias:
         if col not in df.columns:
-            st.error(f"Coluna ausente na planilha: {col}")
+            st.error(f"❌ Coluna ausente: {col}")
             st.stop()
 
-    # Converter data e extrair ano/mês
+    # Corrigir tipos
     df['DATA'] = pd.to_datetime(df['DATA'], errors='coerce')
+    df['LATITUDE'] = pd.to_numeric(df['LATITUDE'], errors='coerce')
+    df['LONGITUDE'] = pd.to_numeric(df['LONGITUDE'], errors='coerce')
+    df['QUANTIDADE'] = pd.to_numeric(df['QUANTIDADE'], errors='coerce')
+
+    # Extrair ano e mês como inteiros
     df['Ano'] = df['DATA'].dt.year
     df['Mês'] = df['DATA'].dt.month.astype('Int64')
 
-    # Garantir que coordenadas sejam numéricas
-    df['LATITUDE'] = pd.to_numeric(df['LATITUDE'], errors='coerce')
-    df['LONGITUDE'] = pd.to_numeric(df['LONGITUDE'], errors='coerce')
-
-    # Remover linhas sem coordenadas válidas
+    # Remover linhas sem coordenadas
     df = df.dropna(subset=['LATITUDE', 'LONGITUDE'])
 
     return df
@@ -41,20 +42,24 @@ st.title("📍 Mapa de Entregas de Hipoclorito")
 st.write("Visualize as entregas georreferenciadas por mês e ano.")
 
 # Filtro de Ano
-ano = st.selectbox("Filtrar por Ano", sorted(df['Ano'].dropna().unique()))
+anos = sorted(df['Ano'].dropna().unique())
+ano = st.selectbox("Filtrar por Ano", anos)
 
 # Filtro de Mês com nomes legíveis
 meses_disponiveis = sorted(df[df['Ano'] == ano]['Mês'].dropna().unique())
 mes_nome = {m: calendar.month_name[m] for m in meses_disponiveis}
 mes = st.selectbox("Filtrar por Mês", meses_disponiveis, format_func=lambda x: mes_nome.get(x, str(x)))
 
-# Dados filtrados
+# Filtrar dados
 dados_filtrados = df[(df['Ano'] == ano) & (df['Mês'] == mes)]
 
-# Inicialização do mapa
+# Mostrar dados filtrados para depuração
+st.subheader("📋 Dados filtrados")
+st.dataframe(dados_filtrados[['DATA', 'LOCAL', 'QUANTIDADE', 'LATITUDE', 'LONGITUDE']])
+
+# Criar mapa
 m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
 
-# Adição de marcadores
 if dados_filtrados.empty:
     st.warning("⚠️ Nenhuma entrega encontrada para o período selecionado.")
 else:
