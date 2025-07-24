@@ -7,7 +7,7 @@ from streamlit_folium import folium_static
 # URL da planilha pública
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
-# Meses em português
+# Mapeamento de meses
 mes_format = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
     7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
@@ -32,16 +32,14 @@ def load_data():
 
 df = load_data()
 
-st.title("📦 Entregas de Hipoclorito")
-st.write("Visualize os frascos entregues e estoques declarados por mês, ano e local.")
+st.title("📦 Entregas e Estoques de Hipoclorito")
+st.write("Visualize os frascos entregues, estoques declarados e saldo acumulado por mês, ano e local.")
 
 # Filtros
-anos = sorted(df['Ano'].dropna().unique())
-ano_opcoes = ["Todos"] + [str(a) for a in anos]
+ano_opcoes = ["Todos"] + sorted(df['Ano'].dropna().unique().astype(str).tolist())
 ano_selecionado = st.selectbox("Filtrar por Ano", options=ano_opcoes)
 
-meses = sorted(df['Mês'].dropna().unique())
-mes_opcoes = ["Todos"] + list(meses)
+mes_opcoes = ["Todos"] + sorted(df['Mês'].dropna().unique().tolist())
 mes_selecionados = st.multiselect(
     "Filtrar por Mês",
     options=mes_opcoes,
@@ -49,8 +47,7 @@ mes_selecionados = st.multiselect(
     format_func=lambda x: "Todos" if x == "Todos" else mes_format.get(x, str(x))
 )
 
-locais = sorted(df['LOCAL'].dropna().unique())
-local_opcoes = ["Todos"] + locais
+local_opcoes = ["Todos"] + sorted(df['LOCAL'].dropna().unique().tolist())
 local_selecionado = st.selectbox("Filtrar por Local", options=local_opcoes)
 
 # Filtros aplicados a entregas (CAIXAS > 0)
@@ -84,7 +81,7 @@ linha_total = pd.DataFrame([{
     'LONGITUDE': ''
 }])
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
-st.dataframe(tabela_final, use_container_width=True)
+st.dataframe(tabela_final, use_container_width=True, hide_index=True)
 
 # Estoques declarados (REMANESCENTES > 0)
 df_estoque = df[df['REMANESCENTES'] > 0].copy()
@@ -97,7 +94,7 @@ if local_selecionado != "Todos":
 
 st.subheader("🧴 Locais com hipoclorito em estoque declarado")
 if not df_estoque.empty:
-    st.dataframe(df_estoque[['LOCAL', 'REMANESCENTES']].drop_duplicates().sort_values(by='REMANESCENTES', ascending=False), use_container_width=True)
+    st.dataframe(df_estoque[['LOCAL', 'REMANESCENTES']].drop_duplicates().sort_values(by='REMANESCENTES', ascending=False), use_container_width=True, hide_index=True)
 else:
     st.info("✅ Nenhum estoque declarado para este filtro.")
 
@@ -114,7 +111,7 @@ folium_static(m)
 
 # Mapa de estoques
 if not df_estoque.empty:
-    st.subheader("🗺️ Estoque de hipoclorito (Remanescentes > 0)")
+    st.subheader("🗺️ Estoques visíveis (Remanescentes > 0)")
     mapa_estoque = folium.Map(location=[-17.89, -43.42], zoom_start=8)
     for _, row in df_estoque.iterrows():
         lat = float(row['LATITUDE'])
@@ -142,6 +139,6 @@ saldo['SALDO_ACUMULADO'] = saldo['TOTAL_ENTREGUE'] - saldo['REMANESCENTES']
 saldo = saldo[['LOCAL', 'TOTAL_ENTREGUE', 'REMANESCENTES', 'SALDO_ACUMULADO']].sort_values(by='SALDO_ACUMULADO', ascending=False)
 
 if not saldo.empty:
-    st.dataframe(saldo, use_container_width=True)
+    st.dataframe(saldo, use_container_width=True, hide_index=True)
 else:
     st.info("✅ Nenhum dado disponível para análise de saldo.")
