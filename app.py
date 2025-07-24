@@ -4,7 +4,7 @@ import folium
 import calendar
 from streamlit_folium import folium_static
 
-# URL da planilha pública
+# URL do CSV
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
 # Tradução dos meses para português
@@ -94,6 +94,18 @@ linha_total = pd.DataFrame([{
 }])
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True)
+
+# Tabela de remanescentes
+locais_com_entregas = df['LOCAL'].dropna().unique()
+locais_atuais = dados['LOCAL'].dropna().unique()
+locais_remanescentes = sorted(set(locais_com_entregas) - set(locais_atuais))
+
+if locais_remanescentes:
+    st.subheader("📌 Locais sem entregas no período selecionado")
+    df_remanescentes = pd.DataFrame({'LOCAL': locais_remanescentes})
+    st.dataframe(df_remanescentes, use_container_width=True)
+else:
+    st.info("✅ Todas as comunidades com entregas históricas estão contempladas neste período.")
 
 # Mapa com somatório por LOCAL
 st.subheader("🗺️ Mapa por Local")
