@@ -80,7 +80,7 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True, hide_index=True)
 
-# Estoques declarados após a entrega mais recente
+# Estoques declarados após entrega mais recente
 df_estoque = df[df['REMANESCENTES'] > 0].copy()
 if ano_selecionado != "Todos":
     df_estoque = df_estoque[df_estoque['Ano'] == int(ano_selecionado)]
@@ -96,14 +96,19 @@ df_estoque = df_estoque[
     (df_estoque['DATA'] >= df_estoque['ULTIMA_ENTREGA']) | (df_estoque['ULTIMA_ENTREGA'].isna())
 ].copy()
 
-# Geração do campo MÊS_ANO e DATA_ESTOQUE
+# Adicionar MÊS_ANO e ordenar por DATA_ESTOQUE
 if not df_estoque.empty and 'Ano' in df_estoque.columns and 'Mês' in df_estoque.columns:
+    df_estoque = df_estoque.dropna(subset=['Ano', 'Mês'])
+    df_estoque['Ano'] = df_estoque['Ano'].astype(int)
+    df_estoque['Mês'] = df_estoque['Mês'].astype(int)
     df_estoque['MÊS_ANO'] = df_estoque.apply(
         lambda row: f"{mes_format.get(row['Mês'], '')} {int(row['Ano'])}", axis=1
     )
-    df_estoque['DATA_ESTOQUE'] = pd.to_datetime(
-        df_estoque[['Ano', 'Mês']].assign(DIA=1), errors='coerce'
-    )
+    df_estoque['DATA_ESTOQUE'] = pd.to_datetime(dict(
+        year=df_estoque['Ano'],
+        month=df_estoque['Mês'],
+        day=1
+    ), errors='coerce')
     df_estoque = df_estoque.sort_values(by='DATA_ESTOQUE')
 else:
     df_estoque['MÊS_ANO'] = ""
@@ -125,8 +130,8 @@ agrupados = dados_entrega.groupby(['LOCAL', 'LATITUDE', 'LONGITUDE'])['FRASCOS']
 for _, row in agrupados.iterrows():
     lat = float(row['LATITUDE'])
     lon = float(row['LONGITUDE'])
-    popup_text = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues"
-    folium.Marker(location=[lat, lon], popup=popup_text).add_to(m)
+    texto = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues"
+    folium.Marker(location=[lat, lon], popup=texto).add_to(m)
 folium_static(m)
 
 # Mapa de estoques
@@ -142,9 +147,4 @@ if not df_estoque.empty:
             location=[lat, lon],
             radius=8,
             color='orange',
-            fill=True,
-            fill_color='orange',
-            fill_opacity=0.7,
-            popup=texto_popup
-        ).add_to(mapa_estoque)
-    folium_static(mapa_estoque)
+            fill=True
