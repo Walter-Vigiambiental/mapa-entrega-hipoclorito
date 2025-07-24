@@ -6,7 +6,7 @@ from streamlit_folium import folium_static
 # URL da planilha pública
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
-# Mapeamento de meses para português
+# Tradução de meses para português
 mes_format = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
     7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
@@ -16,24 +16,20 @@ mes_format = {
 def load_data():
     df = pd.read_csv(CSV_URL)
     df.columns = df.columns.str.strip()
-
-    # Separar coordenadas
     df[['LATITUDE', 'LONGITUDE']] = df['COORDENADAS'].str.split(',', expand=True)
     df['LATITUDE'] = pd.to_numeric(df['LATITUDE'].str.strip(), errors='coerce')
     df['LONGITUDE'] = pd.to_numeric(df['LONGITUDE'].str.strip(), errors='coerce')
-
-    # Datas e valores
     df['DATA'] = pd.to_datetime(df['DATA'], format="%d/%m/%Y", errors='coerce')
     df['Ano'] = df['DATA'].dt.year
     df['Mês'] = df['DATA'].dt.month.astype("Int64")
     df['CAIXAS'] = pd.to_numeric(df['CAIXAS'], errors='coerce')
     df['FRASCOS'] = df['CAIXAS'] * 50
 
-    # Campo de remanescentes
+    # Campo REMANESCENTES tratado
     if 'REMANESCENTES' in df.columns:
         df['REMANESCENTES'] = pd.to_numeric(df['REMANESCENTES'], errors='coerce').fillna(0)
 
-    # Remover coordenadas inválidas e entregas zero
+    # Eliminar coordenadas inválidas e caixas zero
     df = df.dropna(subset=['LATITUDE', 'LONGITUDE'])
     df = df[df['CAIXAS'] > 0]
 
@@ -59,10 +55,15 @@ mes_selecionados = st.multiselect(
 local_opcoes = ["Todos"] + sorted(df['LOCAL'].dropna().unique().tolist())
 local_selecionado = st.selectbox("Filtrar por Local", options=local_opcoes)
 
-# Aplicar filtros
+# Aplicar filtros com validação segura
 dados = df.copy()
 if ano_selecionado != "Todos":
-    dados = dados[dados['Ano'] == int(ano_selecionado)]
+    try:
+        ano_int = int(float(ano_selecionado))
+        dados = dados[dados['Ano'] == ano_int]
+    except ValueError:
+        st.error("Erro: valor de ano inválido.")
+        st.stop()
 
 if "Todos" not in mes_selecionados:
     dados = dados[dados['Mês'].isin([int(m) for m in mes_selecionados])]
@@ -92,7 +93,7 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True)
 
-# Estoques declarados (sem entrega no período)
+# Estoque declarado (somente onde não houve entrega)
 if 'REMANESCENTES' in dados.columns:
     dados['REMANESCENTES'] = pd.to_numeric(dados['REMANESCENTES'], errors='coerce').fillna(0)
     dados['FRASCOS_ENTREGUES'] = dados['FRASCOS'].fillna(0)
@@ -120,9 +121,9 @@ for _, row in agrupados.iterrows():
     folium.Marker(location=[lat, lon], popup=popup_text).add_to(m)
 folium_static(m)
 
-# Mapa de estoques remanescentes
+# Mapa de estoques remanescentes (sem entrega)
 estoque_map = dados[
-    (dados['REMANESCENTES'] > 0) & (dados['FRASCOS'] == 0)
+    (dados['REMANESCENTES'] > 0) & (dados['FRASCOS_ENTREGUES'] == 0)
 ][['LOCAL', 'LATITUDE', 'LONGITUDE', 'REMANESCENTES']].drop_duplicates()
 
 if not estoque_map.empty:
