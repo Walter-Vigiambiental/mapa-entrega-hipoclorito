@@ -148,4 +148,4 @@ if not df_estoque.empty:
             fill_opacity=0.7,
             popup=texto_popup
         ).add_to(mapa_estoque)
-    folium_static(mapa_esto
+    folium_static(mapa_estoque)
