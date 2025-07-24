@@ -110,7 +110,7 @@ if 'REMANESCENTES' in dados.columns:
 else:
     st.warning("⚠️ Campo 'REMANESCENTES' não encontrado nos dados.")
 
-# Mapa por LOCAL
+# Mapa por LOCAL com entregas
 st.subheader("🗺️ Mapa por Local")
 m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
 
@@ -124,3 +124,25 @@ else:
         popup_text = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues no total"
         folium.Marker(location=[lat, lon], popup=popup_text).add_to(m)
     folium_static(m)
+
+# Mapa adicional com estoques remanescentes
+if 'REMANESCENTES' in dados.columns:
+    estoque_map = dados[dados['REMANESCENTES'] > 0][['LOCAL', 'LATITUDE', 'LONGITUDE', 'REMANESCENTES']].drop_duplicates()
+    if not estoque_map.empty:
+        st.subheader("🗺️ Estoque de hipoclorito (Remanescentes > 0)")
+        mapa_remanescentes = folium.Map(location=[-17.89, -43.42], zoom_start=8)
+        for _, row in estoque_map.iterrows():
+            lat = float(row['LATITUDE'])
+            lon = float(row['LONGITUDE'])
+            estoque = int(row['REMANESCENTES'])
+            texto_popup = f"{row['LOCAL']} - {estoque} frascos em estoque"
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=8,
+                color='orange',
+                fill=True,
+                fill_color='orange',
+                fill_opacity=0.7,
+                popup=texto_popup
+            ).add_to(mapa_remanescentes)
+        folium_static(mapa_remanescentes)
