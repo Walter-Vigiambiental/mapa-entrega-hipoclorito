@@ -1,132 +1,43 @@
 import streamlit as st
 import pandas as pd
 import folium
-from streamlit_folium import folium_static
+from folium.plugins import MarkerCluster
+from streamlit_folium import st_folium
+import plotly.express as px
 
-CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
+# --- Carregando dados diretamente da planilha online (CSV)
+url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
+df = pd.read_csv(url)
 
-mes_format = {
-    1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril", 5: "maio", 6: "junho",
-    7: "julho", 8: "agosto", 9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
-}
+# --- Conversão de coordenadas para colunas separadas
+df[['LAT', 'LNG']] = df['COORDENADAS'].str.split(',', expand=True).astype(float)
 
-@st.cache_data(ttl=600)
-def load_data():
-    df = pd.read_csv(CSV_URL)
-    df.columns = df.columns.str.strip()
-    df[['LATITUDE', 'LONGITUDE']] = df['COORDENADAS'].str.split(',', expand=True)
-    df['LATITUDE'] = pd.to_numeric(df['LATITUDE'].str.strip(), errors='coerce')
-    df['LONGITUDE'] = pd.to_numeric(df['LONGITUDE'].str.strip(), errors='coerce')
-    df['DATA'] = pd.to_datetime(df['DATA'], format="%d/%m/%Y", errors='coerce')
-    df['Ano'] = df['DATA'].dt.year
-    df['Mês'] = df['DATA'].dt.month.astype("Int64")
-    df['CAIXAS'] = pd.to_numeric(df['CAIXAS'], errors='coerce')
-    df['FRASCOS'] = df['CAIXAS'] * 50
-    if 'REMANESCENTES' in df.columns:
-        df['REMANESCENTES'] = pd.to_numeric(df['REMANESCENTES'], errors='coerce').fillna(0)
-    df = df.dropna(subset=['LATITUDE', 'LONGITUDE'])
-    return df
+# --- Filtros interativos
+st.title("📦 Distribuição por Local e Mês")
+local = st.selectbox("Filtrar por Local:", sorted(df['LOCAL'].unique()))
+mes = st.selectbox("Filtrar por Mês:", sorted(df['MÊS'].unique()))
 
-df = load_data()
+df_filtered = df[(df['LOCAL'] == local) & (df['MÊS'] == mes)]
 
-st.title("📦 Entregas e Estoques de Hipoclorito")
+# --- Gráfico por quantidade
+st.subheader("📈 Quantidade por Data")
+fig = px.bar(df_filtered, x='DATA', y='QUANTIDADE', color='LOCAL', title=f'Quantidade em {local} - {mes}')
+st.plotly_chart(fig)
 
-anos = sorted(df['Ano'].dropna().astype(int).unique())
-ano_selecionado = st.selectbox("Filtrar por Ano", options=["Todos"] + [str(a) for a in anos])
+# --- Mapa interativo
+st.subheader("🗺️ Mapa de Distribuição")
+m = folium.Map(location=[-16.6, -43.9], zoom_start=9)
+marker_cluster = MarkerCluster().add_to(m)
 
-meses = sorted(df['Mês'].dropna().unique())
-mes_selecionados = st.multiselect(
-    "Filtrar por Mês",
-    options=["Todos"] + list(meses),
-    default=["Todos"],
-    format_func=lambda x: "Todos" if x == "Todos" else mes_format.get(x, str(x)).capitalize()
-)
+for _, row in df.iterrows():
+    folium.Marker(
+        location=[row['LAT'], row['LNG']],
+        popup=f"{row['LOCAL']} - {row['QUANTIDADE']} unidades",
+        tooltip=row['DATA']
+    ).add_to(marker_cluster)
 
-locais = sorted(df['LOCAL'].dropna().unique())
-local_selecionado = st.selectbox("Filtrar por Local", options=["Todos"] + locais)
+st_data = st_folium(m, width=700, height=500)
 
-dados_entrega = df[df['CAIXAS'] > 0].copy()
-if ano_selecionado != "Todos":
-    dados_entrega = dados_entrega[dados_entrega['Ano'] == int(ano_selecionado)]
-if "Todos" not in mes_selecionados:
-    dados_entrega = dados_entrega[dados_entrega['Mês'].isin([int(m) for m in mes_selecionados])]
-if local_selecionado != "Todos":
-    dados_entrega = dados_entrega[dados_entrega['LOCAL'] == local_selecionado]
-
-total_frascos = dados_entrega['FRASCOS'].sum()
-st.subheader("📋 Entregas no período selecionado")
-st.write(f"**Total entregue:** {total_frascos:.0f} frascos")
-
-df_exibicao = dados_entrega.copy()
-df_exibicao['DATA'] = df_exibicao['DATA'].dt.month.map(mes_format).str.capitalize() + " " + df_exibicao['DATA'].dt.year.astype(str)
-tabela = df_exibicao[['DATA', 'LOCAL', 'CAIXAS', 'FRASCOS', 'LATITUDE', 'LONGITUDE']]
-linha_total = pd.DataFrame([{
-    'DATA': 'Total',
-    'LOCAL': '',
-    'CAIXAS': tabela['CAIXAS'].sum(),
-    'FRASCOS': tabela['FRASCOS'].sum(),
-    'LATITUDE': '',
-    'LONGITUDE': ''
-}])
-tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
-st.dataframe(tabela_final, use_container_width=True, hide_index=True)
-
-# Estoques com remanescentes
-df_estoque = df[df['REMANESCENTES'] > 0].copy()
-if ano_selecionado != "Todos":
-    df_estoque = df_estoque[df_estoque['Ano'] == int(ano_selecionado)]
-if "Todos" not in mes_selecionados:
-    df_estoque = df_estoque[df_estoque['Mês'].isin([int(m) for m in mes_selecionados])]
-if local_selecionado != "Todos":
-    df_estoque = df_estoque[df_estoque['LOCAL'] == local_selecionado]
-
-entregas_recentes = dados_entrega.groupby('LOCAL')['DATA'].max().reset_index().rename(columns={'DATA': 'ULTIMA_ENTREGA'})
-df_estoque = pd.merge(df_estoque, entregas_recentes, on='LOCAL', how='left')
-df_estoque = df_estoque[(df_estoque['DATA'] >= df_estoque['ULTIMA_ENTREGA']) | df_estoque['ULTIMA_ENTREGA'].isna()].copy()
-
-df_estoque = df_estoque.dropna(subset=['Ano', 'Mês'])
-df_estoque['Ano'] = pd.to_numeric(df_estoque['Ano'], errors='coerce').astype('Int64')
-df_estoque['Mês'] = pd.to_numeric(df_estoque['Mês'], errors='coerce').astype('Int64')
-df_estoque = df_estoque.dropna(subset=['Ano', 'Mês'])
-
-df_estoque['DATA_ESTOQUE'] = pd.to_datetime({
-    'year': df_estoque['Ano'],
-    'month': df_estoque['Mês'],
-    'day': 1
-}, errors='coerce')
-df_estoque = df_estoque.dropna(subset=['DATA_ESTOQUE'])
-
-# ✅ Correção da coluna MÊS_ANO
-df_estoque['MÊS_ANO'] = df_estoque['DATA_ESTOQUE'].dt.month.map(mes_format).str.capitalize() + " " + df_estoque['DATA_ESTOQUE'].dt.year.astype(str)
-df_estoque = df_estoque.sort_values(by='DATA_ESTOQUE')
-
-st.subheader("🧴 Locais com hipoclorito em estoque declarado")
-if not df_estoque.empty:
-    st.dataframe(df_estoque[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']].drop_duplicates(), use_container_width=True, hide_index=True)
-else:
-    st.info("✅ Nenhum estoque declarado válido para este filtro.")
-
-st.subheader("🗺️ Mapa de Entregas por Local")
-m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
-agrupados = dados_entrega.groupby(['LOCAL', 'LATITUDE', 'LONGITUDE'])['FRASCOS'].sum().reset_index()
-for _, row in agrupados.iterrows():
-    lat = float(row['LATITUDE'])
-    lon = float(row['LONGITUDE'])
-    texto = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues"
-    folium.Marker(location=[lat, lon], popup=texto).add_to(m)
-folium_static(m)
-
-if not df_estoque.empty:
-    st.subheader("🗺️ Estoques visíveis (Remanescentes > 0)")
-    mapa_estoque = folium.Map(location=[-17.89, -43.42], zoom_start=8)
-    for _, row in df_estoque.iterrows():
-        lat = float(row['LATITUDE'])
-        lon = float(row['LONGITUDE'])
-        estoque = int(row['REMANESCENTES'])
-        texto_popup = f"{row['LOCAL']} - {estoque} frascos em estoque"
-        folium.Marker(
-            location=[lat, lon],
-            popup=texto_popup,
-            icon=folium.Icon(color='orange', icon='medkit', prefix='fa')
-        ).add_to(mapa_estoque)
-    folium_static(mapa_estoque)
+# --- Tabela de registros
+st.subheader("📋 Registros")
+st.dataframe(df_filtered)
