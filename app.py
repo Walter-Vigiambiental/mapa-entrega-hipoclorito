@@ -88,7 +88,7 @@ df_ordenado = df_filtrado.sort_values(by="DATA", ascending=True)
 estoques_validos = últimos_lançamentos[últimos_lançamentos['REMANESCENTES'] > 0].copy()
 estoques_validos['MÊS_ANO'] = estoques_validos['DATA'].dt.month.map(mes_format).str.capitalize() + " " + estoques_validos['DATA'].dt.year.astype(str)
 
-st.subheader("🧴 Locais com hipoclorito em estoque declarado")
+st.subheader("📋 Locais com hipoclorito em estoque declarado")
 if not estoques_validos.empty:
     st.dataframe(estoques_validos[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']], use_container_width=True, hide_index=True)
 else:
