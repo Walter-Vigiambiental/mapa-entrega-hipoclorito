@@ -3,7 +3,6 @@ import pandas as pd
 import folium
 from streamlit_folium import folium_static
 
-# 🔗 Fonte dos dados
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
 mes_format = {
@@ -30,10 +29,11 @@ def load_data():
 
 df = load_data()
 
-# 🎯 Filtros
 st.title("📦 Entregas e Estoques de Hipoclorito")
+
 anos = sorted(df['Ano'].dropna().astype(int).unique())
 ano_selecionado = st.selectbox("Filtrar por Ano", options=["Todos"] + [str(a) for a in anos])
+
 meses = sorted(df['Mês'].dropna().unique())
 mes_selecionados = st.multiselect(
     "Filtrar por Mês",
@@ -41,6 +41,7 @@ mes_selecionados = st.multiselect(
     default=["Todos"],
     format_func=lambda x: "Todos" if x == "Todos" else mes_format.get(x, str(x)).capitalize()
 )
+
 locais = sorted(df['LOCAL'].dropna().unique())
 local_selecionado = st.selectbox("Filtrar por Local", options=["Todos"] + locais)
 
@@ -71,26 +72,27 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True, hide_index=True)
 
-# 🧴 Último lançamento com remanescente
-df_estoque = df[df['REMANESCENTES'] > 0].copy()
+# 🧴 Estoque com remanescente > 0 no último lançamento
+df_com_entrega = df[df['FRASCOS'] > 0].copy()
 if ano_selecionado != "Todos":
-    df_estoque = df_estoque[df_estoque['Ano'] == int(ano_selecionado)]
+    df_com_entrega = df_com_entrega[df_com_entrega['Ano'] == int(ano_selecionado)]
 if "Todos" not in mes_selecionados:
-    df_estoque = df_estoque[df_estoque['Mês'].isin([int(m) for m in mes_selecionados])]
+    df_com_entrega = df_com_entrega[df_com_entrega['Mês'].isin([int(m) for m in mes_selecionados])]
 if local_selecionado != "Todos":
-    df_estoque = df_estoque[df_estoque['LOCAL'] == local_selecionado]
+    df_com_entrega = df_com_entrega[df_com_entrega['LOCAL'] == local_selecionado]
 
-df_estoque_ordenado = df_estoque.sort_values(by="DATA", ascending=True)
-últimos_estoques = df_estoque_ordenado.groupby("LOCAL").last().reset_index()
-últimos_estoques['MÊS_ANO'] = últimos_estoques['DATA'].dt.month.map(mes_format).str.capitalize() + " " + últimos_estoques['DATA'].dt.year.astype(str)
+df_ordenado = df_com_entrega.sort_values(by="DATA", ascending=True)
+últimos_lançamentos = df_ordenado.groupby("LOCAL").last().reset_index()
+estoques_validos = últimos_lançamentos[últimos_lançamentos['REMANESCENTES'] > 0].copy()
+estoques_validos['MÊS_ANO'] = estoques_validos['DATA'].dt.month.map(mes_format).str.capitalize() + " " + estoques_validos['DATA'].dt.year.astype(str)
 
 st.subheader("🧴 Locais com hipoclorito em estoque declarado")
-if not últimos_estoques.empty:
-    st.dataframe(últimos_estoques[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']], use_container_width=True, hide_index=True)
+if not estoques_validos.empty:
+    st.dataframe(estoques_validos[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']], use_container_width=True, hide_index=True)
 else:
     st.info("✅ Nenhum estoque declarado válido para este filtro.")
 
-# 🗺️ Mapa de Entregas
+# 🗺️ Mapa de entregas
 st.subheader("🗺️ Mapa de Entregas por Local")
 m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
 agrupados = dados_entrega.groupby(['LOCAL', 'LATITUDE', 'LONGITUDE'])['FRASCOS'].sum().reset_index()
@@ -101,11 +103,11 @@ for _, row in agrupados.iterrows():
     folium.Marker(location=[lat, lon], popup=texto).add_to(m)
 folium_static(m)
 
-# 🗺️ Mapa de Estoque com últimos lançamentos
-if not últimos_estoques.empty:
+# 🗺️ Mapa de estoques válidos
+if not estoques_validos.empty:
     st.subheader("🗺️ Estoques visíveis (Remanescentes > 0)")
     mapa_estoque = folium.Map(location=[-17.89, -43.42], zoom_start=8)
-    for _, row in últimos_estoques.iterrows():
+    for _, row in estoques_validos.iterrows():
         lat = float(row['LATITUDE'])
         lon = float(row['LONGITUDE'])
         estoque = int(row['REMANESCENTES'])
