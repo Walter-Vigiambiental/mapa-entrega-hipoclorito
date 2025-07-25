@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import folium_static
+from datetime import datetime, timedelta
 
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
@@ -31,6 +32,7 @@ df = load_data()
 
 st.title("📦 Entregas e Estoques de Hipoclorito")
 
+# 🔎 Filtros
 anos = sorted(df['Ano'].dropna().astype(int).unique())
 ano_selecionado = st.selectbox("Filtrar por Ano", options=["Todos"] + [str(a) for a in anos])
 
@@ -72,7 +74,7 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True, hide_index=True)
 
-# 🧴 Estoque por último lançamento com remanescente > 0
+# 🧴 Estoque com base no último lançamento (independente de entrega)
 df_filtrado = df.copy()
 if ano_selecionado != "Todos":
     df_filtrado = df_filtrado[df_filtrado['Ano'] == int(ano_selecionado)]
@@ -118,3 +120,18 @@ if not estoques_validos.empty:
             icon=folium.Icon(color='orange', icon='medkit', prefix='fa')
         ).add_to(mapa_estoque)
     folium_static(mapa_estoque)
+
+# 🔔 Alerta de locais sem entrega há mais de 30 dias
+st.subheader("🔔 Locais sem entregas há mais de 1 mês")
+hoje = datetime.today()
+última_entrega = df[df['FRASCOS'] > 0].groupby('LOCAL')['DATA'].max().reset_index()
+última_entrega['DIAS_SEM_ENTREGA'] = (hoje - última_entrega['DATA']).dt.days
+
+locais_alerta = última_entrega[última_entrega['DIAS_SEM_ENTREGA'] > 30]
+
+if not locais_alerta.empty:
+    for _, row in locais_alerta.iterrows():
+        local = row['LOCAL']
+        dias = int(row['DIAS_SEM_ENTREGA'])
+        data_str = row['DATA'].strftime("%d/%m/%Y")
+        st.warning(f"⚠️ **{local}** está há **{dias} dias** sem entrega (última em {
