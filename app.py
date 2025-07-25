@@ -149,3 +149,36 @@ if not locais_alerta.empty:
         st.warning(
             f"⚠️ **{row['LOCAL']}** está há **{int(row['DIAS_SEM_ENTREGA'])} dias** sem entrega (última em {row['DATA'].strftime('%d/%m/%Y')})"
         )
+
+# 🔢 Agrupar entregas por LOCAL
+ranking_entrega = dados_filtrados.groupby('LOCAL', as_index=False)['FRASCOS'].sum()
+
+# 🏆 TOP 5 maiores entregas
+top_5 = ranking_entrega.sort_values(by='FRASCOS', ascending=False).head(5)
+fig_top = px.bar(
+    top_5,
+    x='FRASCOS',
+    y='LOCAL',
+    orientation='h',
+    title='🏆 Locais com Mais Entregas',
+    text='FRASCOS',
+    color='FRASCOS',
+    color_continuous_scale='Greens'
+)
+fig_top.update_layout(yaxis=dict(autorange="reversed"))
+st.plotly_chart(fig_top, use_container_width=True)
+
+# 🐢 TOP 5 menores entregas
+bottom_5 = ranking_entrega.sort_values(by='FRASCOS', ascending=True).head(5)
+fig_bottom = px.bar(
+    bottom_5,
+    x='FRASCOS',
+    y='LOCAL',
+    orientation='h',
+    title='🐢 Locais com Menos Entregas',
+    text='FRASCOS',
+    color='FRASCOS',
+    color_continuous_scale='Reds'
+)
+fig_bottom.update_layout(yaxis=dict(autorange="reversed"))
+st.plotly_chart(fig_bottom, use_container_width=True)
