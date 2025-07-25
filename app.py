@@ -64,18 +64,16 @@ total_frascos = dados_entrega['FRASCOS'].sum()
 st.subheader("📋 Entregas no período selecionado")
 st.write(f"**Total entregue:** {total_frascos:.0f} frascos")
 
-df_exibicao = dados_entrega.copy()
-df_exibicao['DATA'] = df_exibicao['DATA'].dt.month.map(mes_format).str.capitalize() + " " + df_exibicao['DATA'].dt.year.astype(str)
-tabela = df_exibicao[['LOCAL', 'CAIXAS', 'FRASCOS', 'LATITUDE', 'LONGITUDE']]  # 🚫 Coluna 'DATA' removida
+# 🔄 Agrupamento por LOCAL
+tabela_agrupada = dados_entrega.groupby(['LOCAL'], as_index=False)[['CAIXAS', 'FRASCOS']].sum()
 
+# ➕ Linha total no final da tabela
 linha_total = pd.DataFrame([{
-    'LOCAL': '',
-    'CAIXAS': tabela['CAIXAS'].sum(),
-    'FRASCOS': tabela['FRASCOS'].sum(),
-    'LATITUDE': '',
-    'LONGITUDE': ''
+    'LOCAL': 'Total Geral',
+    'CAIXAS': tabela_agrupada['CAIXAS'].sum(),
+    'FRASCOS': tabela_agrupada['FRASCOS'].sum()
 }])
-tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
+tabela_final = pd.concat([tabela_agrupada, linha_total], ignore_index=True)
 
 st.dataframe(
     tabela_final,
@@ -151,4 +149,3 @@ if not locais_alerta.empty:
         st.warning(
             f"⚠️ **{row['LOCAL']}** está há **{int(row['DIAS_SEM_ENTREGA'])} dias** sem entrega (última em {row['DATA'].strftime('%d/%m/%Y')})"
         )
-
