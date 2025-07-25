@@ -72,16 +72,16 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True, hide_index=True)
 
-# 🧴 Estoque com remanescente > 0 no último lançamento
-df_com_entrega = df[df['FRASCOS'] > 0].copy()
+# 🧴 Estoque por último lançamento com remanescente > 0
+df_filtrado = df.copy()
 if ano_selecionado != "Todos":
-    df_com_entrega = df_com_entrega[df_com_entrega['Ano'] == int(ano_selecionado)]
+    df_filtrado = df_filtrado[df_filtrado['Ano'] == int(ano_selecionado)]
 if "Todos" not in mes_selecionados:
-    df_com_entrega = df_com_entrega[df_com_entrega['Mês'].isin([int(m) for m in mes_selecionados])]
+    df_filtrado = df_filtrado[df_filtrado['Mês'].isin([int(m) for m in mes_selecionados])]
 if local_selecionado != "Todos":
-    df_com_entrega = df_com_entrega[df_com_entrega['LOCAL'] == local_selecionado]
+    df_filtrado = df_filtrado[df_filtrado['LOCAL'] == local_selecionado]
 
-df_ordenado = df_com_entrega.sort_values(by="DATA", ascending=True)
+df_ordenado = df_filtrado.sort_values(by="DATA", ascending=True)
 últimos_lançamentos = df_ordenado.groupby("LOCAL").last().reset_index()
 estoques_validos = últimos_lançamentos[últimos_lançamentos['REMANESCENTES'] > 0].copy()
 estoques_validos['MÊS_ANO'] = estoques_validos['DATA'].dt.month.map(mes_format).str.capitalize() + " " + estoques_validos['DATA'].dt.year.astype(str)
