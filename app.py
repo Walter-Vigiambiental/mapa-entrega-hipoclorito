@@ -134,4 +134,4 @@ if not locais_alerta.empty:
         local = row['LOCAL']
         dias = int(row['DIAS_SEM_ENTREGA'])
         data_str = row['DATA'].strftime("%d/%m/%Y")
-        st.warning(f"⚠️ **{local}** está há **{dias} dias** sem entrega (última em {
+        st.warning(f"⚠️ **{local}** está há **{dias} dias** sem entrega (última em **{data_str}**)")
