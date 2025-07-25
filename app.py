@@ -11,7 +11,7 @@ mes_format = {
     7: "julho", 8: "agosto", 9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
 }
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=0)
 def load_data():
     df = pd.read_csv(CSV_URL)
     df.columns = df.columns.str.strip()
