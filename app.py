@@ -100,7 +100,7 @@ df_estoque = df_estoque.dropna(subset=['DATA_ESTOQUE'])
 df_estoque['MÊS_ANO'] = df_estoque['DATA_ESTOQUE'].dt.month.map(mes_format).str.capitalize() + " " + df_estoque['DATA_ESTOQUE'].dt.year.astype(str)
 df_estoque = df_estoque.sort_values(by='DATA_ESTOQUE')
 
-st.subheader("🧴 Locais com hipoclorito em estoque declarado")
+st.subheader("🗺️ Locais com hipoclorito em estoque declarado")
 if not df_estoque.empty:
     st.dataframe(df_estoque[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']].drop_duplicates(), use_container_width=True, hide_index=True)
 else:
