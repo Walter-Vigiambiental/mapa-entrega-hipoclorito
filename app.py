@@ -29,6 +29,7 @@ def load_data():
     return df
 
 df = load_data()
+
 st.set_page_config(page_title="Distribuição Hipoclorito")
 st.title("📦 Entregas e Estoques de Hipoclorito")
 
@@ -38,10 +39,8 @@ meses = sorted(df['Mês'].dropna().unique())
 locais = sorted(df['LOCAL'].dropna().unique())
 
 col1, col2, col3 = st.columns([1, 2, 2])
-
 with col1:
     ano_selecionado = st.selectbox("Ano", options=["Todos"] + [str(a) for a in anos])
-
 with col2:
     mes_selecionados = st.multiselect(
         "Mês",
@@ -49,7 +48,6 @@ with col2:
         default=["Todos"],
         format_func=lambda x: "Todos" if x == "Todos" else mes_format.get(x, str(x)).capitalize()
     )
-
 with col3:
     local_selecionado = st.selectbox("Local", options=["Todos"] + locais)
 
@@ -68,9 +66,9 @@ st.write(f"**Total entregue:** {total_frascos:.0f} frascos")
 
 df_exibicao = dados_entrega.copy()
 df_exibicao['DATA'] = df_exibicao['DATA'].dt.month.map(mes_format).str.capitalize() + " " + df_exibicao['DATA'].dt.year.astype(str)
-tabela = df_exibicao[['DATA', 'LOCAL', 'CAIXAS', 'FRASCOS', 'LATITUDE', 'LONGITUDE']]
+tabela = df_exibicao[['LOCAL', 'CAIXAS', 'FRASCOS', 'LATITUDE', 'LONGITUDE']]  # 🚫 Coluna 'DATA' removida
+
 linha_total = pd.DataFrame([{
-    'DATA': 'Total',
     'LOCAL': '',
     'CAIXAS': tabela['CAIXAS'].sum(),
     'FRASCOS': tabela['FRASCOS'].sum(),
@@ -83,7 +81,6 @@ st.dataframe(
     tabela_final,
     use_container_width=True,
     column_config={
-        "DATA": st.column_config.TextColumn(width="small"),
         "LOCAL": st.column_config.TextColumn(width="small"),
         "CAIXAS": st.column_config.NumberColumn(width="small"),
         "FRASCOS": st.column_config.NumberColumn(width="small"),
@@ -105,7 +102,7 @@ df_ordenado = df_filtrado.sort_values(by="DATA", ascending=True)
 estoques_validos = últimos_lançamentos[últimos_lançamentos['REMANESCENTES'] > 0].copy()
 estoques_validos['MÊS_ANO'] = estoques_validos['DATA'].dt.month.map(mes_format).str.capitalize() + " " + estoques_validos['DATA'].dt.year.astype(str)
 
-st.subheader("🧴 Locais com hipoclorito em estoque declarado")
+st.subheader("📋 Locais com hipoclorito em estoque declarado")
 if not estoques_validos.empty:
     st.dataframe(
         estoques_validos[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']],
@@ -152,5 +149,6 @@ locais_alerta = última_entrega[última_entrega['DIAS_SEM_ENTREGA'] > 30]
 if not locais_alerta.empty:
     for _, row in locais_alerta.iterrows():
         st.warning(
-                f"⚠️ **{row['LOCAL']}** está há **{int(row['DIAS_SEM_ENTREGA'])} dias** sem entrega (última em {row['DATA'].strftime('%d/%m/%Y')})"
-)
+            f"⚠️ **{row['LOCAL']}** está há **{int(row['DIAS_SEM_ENTREGA'])} dias** sem entrega (última em {row['DATA'].strftime('%d/%m/%Y')})"
+        )
+
