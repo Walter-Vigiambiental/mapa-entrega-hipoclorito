@@ -5,7 +5,6 @@ from streamlit_folium import folium_static
 
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
-# Dicionário mês em português-BR
 mes_format = {
     1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril", 5: "maio", 6: "junho",
     7: "julho", 8: "agosto", 9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
@@ -59,10 +58,7 @@ st.subheader("📋 Entregas no período selecionado")
 st.write(f"**Total entregue:** {total_frascos:.0f} frascos")
 
 df_exibicao = dados_entrega.copy()
-df_exibicao['DATA'] = df_exibicao.apply(
-    lambda row: f"{mes_format.get(row['Mês'], '')} {int(row['Ano'])}".capitalize() if pd.notnull(row['DATA']) else "",
-    axis=1
-)
+df_exibicao['DATA'] = df_exibicao['DATA'].dt.month.map(mes_format).str.capitalize() + " " + df_exibicao['DATA'].dt.year.astype(str)
 tabela = df_exibicao[['DATA', 'LOCAL', 'CAIXAS', 'FRASCOS', 'LATITUDE', 'LONGITUDE']]
 linha_total = pd.DataFrame([{
     'DATA': 'Total',
@@ -75,7 +71,7 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True, hide_index=True)
 
-# Estoques filtrados
+# Estoques com remanescentes
 df_estoque = df[df['REMANESCENTES'] > 0].copy()
 if ano_selecionado != "Todos":
     df_estoque = df_estoque[df_estoque['Ano'] == int(ano_selecionado)]
@@ -86,34 +82,27 @@ if local_selecionado != "Todos":
 
 entregas_recentes = dados_entrega.groupby('LOCAL')['DATA'].max().reset_index().rename(columns={'DATA': 'ULTIMA_ENTREGA'})
 df_estoque = pd.merge(df_estoque, entregas_recentes, on='LOCAL', how='left')
-df_estoque = df_estoque[
-    (df_estoque['DATA'] >= df_estoque['ULTIMA_ENTREGA']) | (df_estoque['ULTIMA_ENTREGA'].isna())
-].copy()
+df_estoque = df_estoque[(df_estoque['DATA'] >= df_estoque['ULTIMA_ENTREGA']) | df_estoque['ULTIMA_ENTREGA'].isna()].copy()
 
-# Criar MÊS_ANO com tradução correta e ordenação segura
 df_estoque = df_estoque.dropna(subset=['Ano', 'Mês'])
 df_estoque['Ano'] = pd.to_numeric(df_estoque['Ano'], errors='coerce').astype('Int64')
 df_estoque['Mês'] = pd.to_numeric(df_estoque['Mês'], errors='coerce').astype('Int64')
 df_estoque = df_estoque.dropna(subset=['Ano', 'Mês'])
+
 df_estoque['DATA_ESTOQUE'] = pd.to_datetime({
     'year': df_estoque['Ano'],
     'month': df_estoque['Mês'],
     'day': 1
 }, errors='coerce')
 df_estoque = df_estoque.dropna(subset=['DATA_ESTOQUE'])
-df_estoque['MÊS_ANO'] = df_estoque.apply(
-    lambda row: f"{mes_format.get(row['Mês'], '')} {int(row['Ano'])}".capitalize(),
-    axis=1
-)
+
+# ✅ Correção da coluna MÊS_ANO
+df_estoque['MÊS_ANO'] = df_estoque['DATA_ESTOQUE'].dt.month.map(mes_format).str.capitalize() + " " + df_estoque['DATA_ESTOQUE'].dt.year.astype(str)
 df_estoque = df_estoque.sort_values(by='DATA_ESTOQUE')
 
 st.subheader("🧴 Locais com hipoclorito em estoque declarado")
 if not df_estoque.empty:
-    st.dataframe(
-        df_estoque[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']].drop_duplicates(),
-        use_container_width=True,
-        hide_index=True
-    )
+    st.dataframe(df_estoque[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']].drop_duplicates(), use_container_width=True, hide_index=True)
 else:
     st.info("✅ Nenhum estoque declarado válido para este filtro.")
 
@@ -135,13 +124,9 @@ if not df_estoque.empty:
         lon = float(row['LONGITUDE'])
         estoque = int(row['REMANESCENTES'])
         texto_popup = f"{row['LOCAL']} - {estoque} frascos em estoque"
-        folium.CircleMarker(
+        folium.Marker(
             location=[lat, lon],
-            radius=8,
-            color='orange',
-            fill=True,
-            fill_color='orange',
-            fill_opacity=0.7,
-            popup=texto_popup
+            popup=texto_popup,
+            icon=folium.Icon(color='orange', icon='medkit', prefix='fa')
         ).add_to(mapa_estoque)
     folium_static(mapa_estoque)
