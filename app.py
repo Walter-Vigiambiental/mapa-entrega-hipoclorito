@@ -10,7 +10,7 @@ mes_format = {
     7: "julho", 8: "agosto", 9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
 }
 
-@st.cache_data(ttl=0)
+@st.cache_data(ttl=600)
 def load_data():
     df = pd.read_csv(CSV_URL)
     df.columns = df.columns.str.strip()
@@ -45,6 +45,7 @@ mes_selecionados = st.multiselect(
 locais = sorted(df['LOCAL'].dropna().unique())
 local_selecionado = st.selectbox("Filtrar por Local", options=["Todos"] + locais)
 
+# Filtrando dados de entrega
 dados_entrega = df[df['CAIXAS'] > 0].copy()
 if ano_selecionado != "Todos":
     dados_entrega = dados_entrega[dados_entrega['Ano'] == int(ano_selecionado)]
@@ -57,6 +58,7 @@ total_frascos = dados_entrega['FRASCOS'].sum()
 st.subheader("📋 Entregas no período selecionado")
 st.write(f"**Total entregue:** {total_frascos:.0f} frascos")
 
+# Tabela de entregas
 df_exibicao = dados_entrega.copy()
 df_exibicao['DATA'] = df_exibicao['DATA'].dt.month.map(mes_format).str.capitalize() + " " + df_exibicao['DATA'].dt.year.astype(str)
 tabela = df_exibicao[['DATA', 'LOCAL', 'CAIXAS', 'FRASCOS', 'LATITUDE', 'LONGITUDE']]
@@ -71,8 +73,9 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True, hide_index=True)
 
-# Estoques com remanescentes
+# 🎯 Estoques com remanescentes ajustados
 df_estoque = df[df['REMANESCENTES'] > 0].copy()
+
 if ano_selecionado != "Todos":
     df_estoque = df_estoque[df_estoque['Ano'] == int(ano_selecionado)]
 if "Todos" not in mes_selecionados:
@@ -80,32 +83,38 @@ if "Todos" not in mes_selecionados:
 if local_selecionado != "Todos":
     df_estoque = df_estoque[df_estoque['LOCAL'] == local_selecionado]
 
+# Incorporando data da última entrega por local
 entregas_recentes = dados_entrega.groupby('LOCAL')['DATA'].max().reset_index().rename(columns={'DATA': 'ULTIMA_ENTREGA'})
 df_estoque = pd.merge(df_estoque, entregas_recentes, on='LOCAL', how='left')
+
+# Filtrar estoques que vieram depois da última entrega (ou sem entrega registrada)
 df_estoque = df_estoque[(df_estoque['DATA'] >= df_estoque['ULTIMA_ENTREGA']) | df_estoque['ULTIMA_ENTREGA'].isna()].copy()
 
-df_estoque = df_estoque.dropna(subset=['Ano', 'Mês'])
-df_estoque['Ano'] = pd.to_numeric(df_estoque['Ano'], errors='coerce').astype('Int64')
-df_estoque['Mês'] = pd.to_numeric(df_estoque['Mês'], errors='coerce').astype('Int64')
-df_estoque = df_estoque.dropna(subset=['Ano', 'Mês'])
-
+# Criação da coluna de data e mês/ano
 df_estoque['DATA_ESTOQUE'] = pd.to_datetime({
     'year': df_estoque['Ano'],
     'month': df_estoque['Mês'],
     'day': 1
 }, errors='coerce')
-df_estoque = df_estoque.dropna(subset=['DATA_ESTOQUE'])
-
-# ✅ Correção da coluna MÊS_ANO
 df_estoque['MÊS_ANO'] = df_estoque['DATA_ESTOQUE'].dt.month.map(mes_format).str.capitalize() + " " + df_estoque['DATA_ESTOQUE'].dt.year.astype(str)
-df_estoque = df_estoque.sort_values(by='DATA_ESTOQUE')
 
-st.subheader("📋 Locais com hipoclorito em estoque declarado")
+# 💡 Ajuste do estoque final condicional
+df_estoque['ESTOQUE_FINAL'] = df_estoque.apply(
+    lambda row: 0 if pd.isna(row['CAIXAS']) or row['CAIXAS'] == 0 else row['REMANESCENTES'],
+    axis=1
+)
+
+st.subheader("🧴 Locais com hipoclorito em estoque declarado")
 if not df_estoque.empty:
-    st.dataframe(df_estoque[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']].drop_duplicates(), use_container_width=True, hide_index=True)
+    st.dataframe(
+        df_estoque[['LOCAL', 'MÊS_ANO', 'ESTOQUE_FINAL']].drop_duplicates(),
+        use_container_width=True,
+        hide_index=True
+    )
 else:
     st.info("✅ Nenhum estoque declarado válido para este filtro.")
 
+# 🗺️ Mapa de entregas
 st.subheader("🗺️ Mapa de Entregas por Local")
 m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
 agrupados = dados_entrega.groupby(['LOCAL', 'LATITUDE', 'LONGITUDE'])['FRASCOS'].sum().reset_index()
@@ -116,13 +125,14 @@ for _, row in agrupados.iterrows():
     folium.Marker(location=[lat, lon], popup=texto).add_to(m)
 folium_static(m)
 
+# 🗺️ Mapa de estoques
 if not df_estoque.empty:
-    st.subheader("🗺️ Estoques visíveis (Remanescentes > 0)")
+    st.subheader("🗺️ Estoques visíveis")
     mapa_estoque = folium.Map(location=[-17.89, -43.42], zoom_start=8)
     for _, row in df_estoque.iterrows():
         lat = float(row['LATITUDE'])
         lon = float(row['LONGITUDE'])
-        estoque = int(row['REMANESCENTES'])
+        estoque = int(row['ESTOQUE_FINAL'])
         texto_popup = f"{row['LOCAL']} - {estoque} frascos em estoque"
         folium.Marker(
             location=[lat, lon],
