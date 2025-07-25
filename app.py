@@ -72,7 +72,7 @@ linha_total = pd.DataFrame([{
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
 st.dataframe(tabela_final, use_container_width=True, hide_index=True)
 
-# 🆕 TABELA CONSOLIDADA DE ESTOQUE FINAL POR LOCAL
+# 🆕 Tabela Consolidada: Apenas locais com estoque > 0
 df_consolidado = df.copy()
 agrupado = df_consolidado.groupby('LOCAL').agg({
     'FRASCOS': 'sum',
@@ -85,13 +85,14 @@ agrupado['ESTOQUE_FINAL'] = agrupado.apply(
 )
 
 agrupado = agrupado.rename(columns={
-    'FRASCOS': 'ENTREGUES',
-    'REMANESCENTES': 'REMANESCENTES_DECLARADOS'
+    'FRASCOS': 'ENTREGUES'
 })
 
-st.subheader("📍 Tabela Consolidada de Estoque Final por Local")
+agrupado_filtrado = agrupado[agrupado['ESTOQUE_FINAL'] > 0].copy()
+
+st.subheader("📍 Locais com Estoque Positivo")
 st.dataframe(
-    agrupado[['LOCAL', 'ENTREGUES', 'REMANESCENTES_DECLARADOS', 'ESTOQUE_FINAL']],
+    agrupado_filtrado[['LOCAL', 'ENTREGUES', 'ESTOQUE_FINAL']],
     use_container_width=True,
     hide_index=True
 )
