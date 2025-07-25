@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import folium_static
-from datetime import datetime, timedelta
+from datetime import datetime
 
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
@@ -29,24 +29,28 @@ def load_data():
     return df
 
 df = load_data()
-
-st.set_page_config(page_title="Mapa VigiSolo")
 st.title("📦 Entregas e Estoques de Hipoclorito")
 
-# 🔎 Filtros
+# 🔎 Filtros organizados
 anos = sorted(df['Ano'].dropna().astype(int).unique())
-ano_selecionado = st.selectbox("Filtrar por Ano", options=["Todos"] + [str(a) for a in anos])
-
 meses = sorted(df['Mês'].dropna().unique())
-mes_selecionados = st.multiselect(
-    "Filtrar por Mês",
-    options=["Todos"] + list(meses),
-    default=["Todos"],
-    format_func=lambda x: "Todos" if x == "Todos" else mes_format.get(x, str(x)).capitalize()
-)
-
 locais = sorted(df['LOCAL'].dropna().unique())
-local_selecionado = st.selectbox("Filtrar por Local", options=["Todos"] + locais)
+
+col1, col2, col3 = st.columns([1, 2, 2])
+
+with col1:
+    ano_selecionado = st.selectbox("Ano", options=["Todos"] + [str(a) for a in anos])
+
+with col2:
+    mes_selecionados = st.multiselect(
+        "Mês",
+        options=["Todos"] + list(meses),
+        default=["Todos"],
+        format_func=lambda x: "Todos" if x == "Todos" else mes_format.get(x, str(x)).capitalize()
+    )
+
+with col3:
+    local_selecionado = st.selectbox("Local", options=["Todos"] + locais)
 
 # 📦 Entregas
 dados_entrega = df[df['CAIXAS'] > 0].copy()
@@ -73,9 +77,20 @@ linha_total = pd.DataFrame([{
     'LONGITUDE': ''
 }])
 tabela_final = pd.concat([tabela, linha_total], ignore_index=True)
-st.dataframe(tabela_final, use_container_width=True, hide_index=True)
 
-# 🧴 Estoque com base no último lançamento (independente de entrega)
+st.dataframe(
+    tabela_final,
+    use_container_width=True,
+    column_config={
+        "DATA": st.column_config.TextColumn(width="small"),
+        "LOCAL": st.column_config.TextColumn(width="small"),
+        "CAIXAS": st.column_config.NumberColumn(width="small"),
+        "FRASCOS": st.column_config.NumberColumn(width="small"),
+    },
+    hide_index=True
+)
+
+# 🧴 Estoques com base no último lançamento
 df_filtrado = df.copy()
 if ano_selecionado != "Todos":
     df_filtrado = df_filtrado[df_filtrado['Ano'] == int(ano_selecionado)]
@@ -89,9 +104,18 @@ df_ordenado = df_filtrado.sort_values(by="DATA", ascending=True)
 estoques_validos = últimos_lançamentos[últimos_lançamentos['REMANESCENTES'] > 0].copy()
 estoques_validos['MÊS_ANO'] = estoques_validos['DATA'].dt.month.map(mes_format).str.capitalize() + " " + estoques_validos['DATA'].dt.year.astype(str)
 
-st.subheader("📋 Locais com hipoclorito em estoque declarado")
+st.subheader("🧴 Locais com hipoclorito em estoque declarado")
 if not estoques_validos.empty:
-    st.dataframe(estoques_validos[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']], use_container_width=True, hide_index=True)
+    st.dataframe(
+        estoques_validos[['LOCAL', 'MÊS_ANO', 'REMANESCENTES']],
+        use_container_width=True,
+        column_config={
+            "LOCAL": st.column_config.TextColumn(width="small"),
+            "MÊS_ANO": st.column_config.TextColumn(width="small"),
+            "REMANESCENTES": st.column_config.NumberColumn(width="small"),
+        },
+        hide_index=True
+    )
 else:
     st.info("✅ Nenhum estoque declarado válido para este filtro.")
 
@@ -100,24 +124,20 @@ st.subheader("🗺️ Mapa de Entregas por Local")
 m = folium.Map(location=[-17.89, -43.42], zoom_start=8)
 agrupados = dados_entrega.groupby(['LOCAL', 'LATITUDE', 'LONGITUDE'])['FRASCOS'].sum().reset_index()
 for _, row in agrupados.iterrows():
-    lat = float(row['LATITUDE'])
-    lon = float(row['LONGITUDE'])
-    texto = f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues"
-    folium.Marker(location=[lat, lon], popup=texto).add_to(m)
+    folium.Marker(
+        location=[row['LATITUDE'], row['LONGITUDE']],
+        popup=f"{row['LOCAL']} - {row['FRASCOS']:.0f} frascos entregues"
+    ).add_to(m)
 folium_static(m)
 
-# 🗺️ Mapa de estoques válidos
+# 🗺️ Mapa de estoques
 if not estoques_validos.empty:
     st.subheader("🗺️ Estoques visíveis (Remanescentes > 0)")
     mapa_estoque = folium.Map(location=[-17.89, -43.42], zoom_start=8)
     for _, row in estoques_validos.iterrows():
-        lat = float(row['LATITUDE'])
-        lon = float(row['LONGITUDE'])
-        estoque = int(row['REMANESCENTES'])
-        texto_popup = f"{row['LOCAL']} - {estoque} frascos em estoque"
         folium.Marker(
-            location=[lat, lon],
-            popup=texto_popup,
+            location=[row['LATITUDE'], row['LONGITUDE']],
+            popup=f"{row['LOCAL']} - {int(row['REMANESCENTES'])} frascos em estoque",
             icon=folium.Icon(color='orange', icon='medkit', prefix='fa')
         ).add_to(mapa_estoque)
     folium_static(mapa_estoque)
@@ -127,12 +147,8 @@ st.subheader("🔔 Locais sem entregas há mais de 1 mês")
 hoje = datetime.today()
 última_entrega = df[df['FRASCOS'] > 0].groupby('LOCAL')['DATA'].max().reset_index()
 última_entrega['DIAS_SEM_ENTREGA'] = (hoje - última_entrega['DATA']).dt.days
-
 locais_alerta = última_entrega[última_entrega['DIAS_SEM_ENTREGA'] > 30]
-
 if not locais_alerta.empty:
     for _, row in locais_alerta.iterrows():
-        local = row['LOCAL']
-        dias = int(row['DIAS_SEM_ENTREGA'])
-        data_str = row['DATA'].strftime("%d/%m/%Y")
-        st.warning(f"⚠️ **{local}** está há **{dias} dias** sem entrega (última em **{data_str}**)")
+        st.warning(
+            f"⚠️ **{row['LOCAL']}** está há **{int(row['DIAS_SEM_ENTREGA'])} dias** sem entrega (última em {row['DATA'].strftime('%d/%m
