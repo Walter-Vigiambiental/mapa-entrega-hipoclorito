@@ -30,7 +30,7 @@ def load_data():
 
 df = load_data()
 
-st.set_page_config(page_title="Distribuição de Hipoclorito", layout="wide")
+st.set_page_config(page_title="Distribuição de Hipoclorito")
 st.title("📦 Entregas e Estoques de Hipoclorito")
 
 # 🔎 Filtros
