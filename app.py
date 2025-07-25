@@ -151,7 +151,5 @@ locais_alerta = última_entrega[última_entrega['DIAS_SEM_ENTREGA'] > 30]
 if not locais_alerta.empty:
     for _, row in locais_alerta.iterrows():
         st.warning(
-            st.warning(
-    st.warning(
-    f"⚠️ **{row['LOCAL']}** está há **{int(row['DIAS_SEM_ENTREGA'])} dias** sem entrega (última em {row['DATA'].strftime('%d/%m/%Y')})"
+                f"⚠️ **{row['LOCAL']}** está há **{int(row['DIAS_SEM_ENTREGA'])} dias** sem entrega (última em {row['DATA'].strftime('%d/%m/%Y')})"
 )
