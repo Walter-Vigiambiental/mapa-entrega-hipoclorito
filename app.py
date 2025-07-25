@@ -3,6 +3,7 @@ import pandas as pd
 import folium
 from streamlit_folium import folium_static
 from datetime import datetime
+import plotly.express as px
 
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKVnXBBM5iqN_dl4N_Ys0m0MWgpIIr0ejqG1UzDR7Ede-OJ03uX1oU5Jjxi8wSuRDXHil1MD-JoFhG/pub?gid=202398924&single=true&output=csv"
 
@@ -33,7 +34,7 @@ df = load_data()
 st.set_page_config(page_title="Distribuição Hipoclorito")
 st.title("📦 Entregas e Estoques de Hipoclorito")
 
-# 🔎 Filtros organizados
+# 🔎 Filtros
 anos = sorted(df['Ano'].dropna().astype(int).unique())
 meses = sorted(df['Mês'].dropna().unique())
 locais = sorted(df['LOCAL'].dropna().unique())
@@ -64,10 +65,8 @@ total_frascos = dados_entrega['FRASCOS'].sum()
 st.subheader("📋 Entregas no período selecionado")
 st.write(f"**Total entregue:** {total_frascos:.0f} frascos")
 
-# 🔄 Agrupamento por LOCAL
+# 🔄 Tabela resumida por local
 tabela_agrupada = dados_entrega.groupby(['LOCAL'], as_index=False)[['CAIXAS', 'FRASCOS']].sum()
-
-# ➕ Linha total no final da tabela
 linha_total = pd.DataFrame([{
     'LOCAL': 'Total Geral',
     'CAIXAS': tabela_agrupada['CAIXAS'].sum(),
@@ -86,7 +85,7 @@ st.dataframe(
     hide_index=True
 )
 
-# 🧴 Estoques com base no último lançamento
+# 🧴 Estoques válidos
 df_filtrado = df.copy()
 if ano_selecionado != "Todos":
     df_filtrado = df_filtrado[df_filtrado['Ano'] == int(ano_selecionado)]
@@ -138,7 +137,7 @@ if not estoques_validos.empty:
         ).add_to(mapa_estoque)
     folium_static(mapa_estoque)
 
-# 🔔 Alerta de locais sem entrega há mais de 30 dias
+# 🔔 Alerta de locais sem entrega há mais de 1 mês
 st.subheader("🔔 Locais sem entregas há mais de 1 mês")
 hoje = datetime.today()
 última_entrega = df[df['FRASCOS'] > 0].groupby('LOCAL')['DATA'].max().reset_index()
@@ -150,10 +149,10 @@ if not locais_alerta.empty:
             f"⚠️ **{row['LOCAL']}** está há **{int(row['DIAS_SEM_ENTREGA'])} dias** sem entrega (última em {row['DATA'].strftime('%d/%m/%Y')})"
         )
 
-# 🔢 Agrupar entregas por LOCAL
-ranking_entrega = dados_filtrados.groupby('LOCAL', as_index=False)['FRASCOS'].sum()
+# 📊 Gráficos de TOP 5 entregas por local
+ranking_entrega = dados_entrega.groupby('LOCAL', as_index=False)['FRASCOS'].sum()
 
-# 🏆 TOP 5 maiores entregas
+# 🏆 Locais com mais entregas
 top_5 = ranking_entrega.sort_values(by='FRASCOS', ascending=False).head(5)
 fig_top = px.bar(
     top_5,
@@ -168,7 +167,7 @@ fig_top = px.bar(
 fig_top.update_layout(yaxis=dict(autorange="reversed"))
 st.plotly_chart(fig_top, use_container_width=True)
 
-# 🐢 TOP 5 menores entregas
+# 🐢 Locais com menos entregas
 bottom_5 = ranking_entrega.sort_values(by='FRASCOS', ascending=True).head(5)
 fig_bottom = px.bar(
     bottom_5,
