@@ -181,3 +181,7 @@ fig_bottom = px.bar(
 )
 fig_bottom.update_layout(yaxis=dict(autorange="reversed"))
 st.plotly_chart(fig_bottom, use_container_width=True)
+
+st.markdown("---")
+st.caption("Desenvolvido por Walter Alves usando Streamlit.")
+
