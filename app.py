@@ -139,7 +139,7 @@ if not estoques_validos.empty:
 
 # 🔔 Alerta de locais sem entrega há mais de 1 mês
 st.subheader("🔔 Locais sem entregas há mais de 1 mês")
-hoje = datetime.today()
+hoje = pd.Timestamp.now().normalize()  # Garante compatibilidade com o tipo de data usado no DataFrame
 última_entrega = df[df['FRASCOS'] > 0].groupby('LOCAL')['DATA'].max().reset_index()
 última_entrega['DIAS_SEM_ENTREGA'] = (hoje - última_entrega['DATA']).dt.days
 locais_alerta = última_entrega[última_entrega['DIAS_SEM_ENTREGA'] > 30]
