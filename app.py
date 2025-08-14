@@ -137,14 +137,14 @@ if not estoques_validos.empty:
         ).add_to(mapa_estoque)
     folium_static(mapa_estoque)
 
-# 🔔 Alerta de locais sem entrega há mais de 1 mês
+# 🔔 Alerta de locais sem entrega há mais de 1 mês (apenas alertas)
 st.subheader("🔔 Locais sem entregas há mais de 1 mês")
 hoje = pd.Timestamp.now().normalize()
 última_entrega = df[df['FRASCOS'] > 0].groupby('LOCAL')['DATA'].max().reset_index()
 última_entrega['DIAS_SEM_ENTREGA'] = (hoje - última_entrega['DATA']).dt.days
 locais_alerta = última_entrega[última_entrega['DIAS_SEM_ENTREGA'] > 30].copy()
 
-# 🔹 Garantir formato fixo
+# Garantir formato de data
 locais_alerta['DATA'] = locais_alerta['DATA'].dt.strftime('%d/%m/%Y')
 
 if not locais_alerta.empty:
@@ -152,18 +152,6 @@ if not locais_alerta.empty:
         st.warning(
             f"⚠️ **{row['LOCAL']}** está há **{int(row['DIAS_SEM_ENTREGA'])} dias** sem entrega (última em {row['DATA']})"
         )
-
-    # Exibir tabela formatada
-    st.dataframe(
-        locais_alerta[['LOCAL', 'DATA', 'DIAS_SEM_ENTREGA']],
-        use_container_width=True,
-        column_config={
-            "LOCAL": st.column_config.TextColumn(width="small"),
-            "DATA": st.column_config.TextColumn(width="small"),
-            "DIAS_SEM_ENTREGA": st.column_config.NumberColumn(width="small"),
-        },
-        hide_index=True
-    )
 
 # 📊 Gráficos de TOP 5 entregas por local
 ranking_entrega = dados_entrega.groupby('LOCAL', as_index=False)['FRASCOS'].sum()
@@ -200,6 +188,3 @@ st.plotly_chart(fig_bottom, use_container_width=True)
 
 st.markdown("---")
 st.caption("Desenvolvido por Walter Alves usando Streamlit.")
-
-
-
