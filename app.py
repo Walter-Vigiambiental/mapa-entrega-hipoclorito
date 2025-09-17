@@ -127,7 +127,7 @@ folium_static(m)
 
 # 🗺️ Mapa de estoques
 if not estoques_validos.empty:
-    st.subheader("🗺️ Estoques visíveis (Remanescentes > 0)")
+    st.subheader("🗺️ Estoques (Remanescentes > 0)")
     mapa_estoque = folium.Map(location=[-17.89, -43.42], zoom_start=8)
     for _, row in estoques_validos.iterrows():
         folium.Marker(
@@ -138,7 +138,7 @@ if not estoques_validos.empty:
     folium_static(mapa_estoque)
 
 # 🔔 Alerta de locais sem entrega há mais de 1 mês (apenas alertas)
-st.subheader("🔔 Locais sem entregas há mais de 1 mês")
+st.subheader("🔔 Áreas sem entregas superior a 30 dias")
 hoje = pd.Timestamp.now().normalize()
 última_entrega = df[df['FRASCOS'] > 0].groupby('LOCAL')['DATA'].max().reset_index()
 última_entrega['DIAS_SEM_ENTREGA'] = (hoje - última_entrega['DATA']).dt.days
@@ -188,3 +188,4 @@ st.plotly_chart(fig_bottom, use_container_width=True)
 
 st.markdown("---")
 st.caption("Desenvolvido por Walter Alves usando Streamlit.")
+
